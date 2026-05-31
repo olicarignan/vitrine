@@ -1,0 +1,206 @@
+.lightbox {
+  position: fixed;
+  inset: 0;
+  z-index: 100;
+  display: flex;
+  align-items: center;
+
+  @media (min-width: 700px) {
+    /* Fill available width (leaving a 20px gap + 20px peek per side), capped so
+       the height never exceeds 100vh - 40px while keeping the 3/2 aspect ratio. */
+    --lb-active-width: min(calc(100vw - 80px), calc((100dvh - 40px) * 3 / 2));
+  }
+
+  .lightbox__backdrop {
+    position: absolute;
+    inset: 0;
+    background-color: rgba(0, 0, 0, 0.1);
+    backdrop-filter: blur(20px);
+    cursor:
+      url("/images/svg/cursor_x.svg") 8 8,
+      zoom-out;
+  }
+
+  .lightbox__track {
+    position: relative;
+    display: flex;
+    gap: 4rem;
+    overflow-x: auto;
+    overflow-y: hidden;
+    scroll-snap-type: x mandatory;
+    -webkit-overflow-scrolling: touch;
+    scrollbar-width: none;
+    width: 100%;
+    padding-inline: 2.5vw;
+    scroll-padding-inline: 2.5vw;
+
+    @media (min-width: 700px) {
+      gap: 20px;
+      padding-inline: calc((100vw - var(--lb-active-width)) / 2);
+      scroll-padding-inline: calc((100vw - var(--lb-active-width)) / 2);
+    }
+
+    &::-webkit-scrollbar {
+      display: none;
+    }
+  }
+
+  .lightbox__item {
+    flex-shrink: 0;
+    width: min(95vw, 120dvh);
+    scroll-snap-align: center;
+    position: relative;
+    cursor: pointer;
+    container-type: inline-size;
+
+    @media (min-width: 700px) {
+      width: var(--lb-active-width);
+    }
+  }
+
+  &:not(.lightbox--revealed) .lightbox__item:not(.lightbox__item--active) {
+    opacity: 0;
+    filter: blur(4px);
+    transform: scale(0.92);
+    transition:
+      opacity 1s cubic-bezier(0, 0.55, 0.45, 1),
+      transform 1s cubic-bezier(0, 0.55, 0.45, 1),
+      filter 1s cubic-bezier(0, 0.55, 0.45, 1);
+  }
+
+  .lightbox__item img,
+  .lightbox__item video {
+    display: block;
+    width: 100%;
+    object-fit: cover;
+    aspect-ratio: 3 / 2;
+    border-radius: 12px;
+    user-select: none;
+    -webkit-user-drag: none;
+
+    @media screen {
+      border-radius: 16px;
+    }
+  }
+
+  .lightbox__img {
+    display: block;
+  }
+
+  .lightbox__img--high {
+    position: absolute;
+    inset: 0;
+    opacity: 0;
+    transition: opacity 0.4s ease;
+  }
+
+  .lightbox__img--high.lightbox__img--ready {
+    opacity: 1;
+  }
+
+  .lightbox__item video {
+    position: absolute;
+    inset: 0;
+    opacity: 0;
+  }
+
+  .lightbox__item--active {
+    cursor:
+      url("/images/svg/cursor_x.svg") 8 8,
+      zoom-out;
+
+    video {
+      opacity: 1;
+    }
+  }
+
+  .lightbox__item--video-ready img {
+    opacity: 0;
+  }
+
+  .lightbox__close {
+    display: none;
+
+    @media (max-width: 699px) {
+      display: block;
+      position: fixed;
+      bottom: 2rem;
+      left: 50%;
+      transform: translateX(-50%);
+      border: none;
+      border-radius: 999px;
+      z-index: 10;
+      padding: 1.25rem;
+      color: var(--color-text);
+      font-size: 0.875rem;
+      letter-spacing: 0.05em;
+      cursor: pointer;
+      opacity: 0;
+      transition: opacity 1s cubic-bezier(0, 0.55, 0.45, 1);
+      background: color-mix(in srgb, var(--accent-color) 10%, transparent);
+      backdrop-filter: blur(12px);
+    }
+  }
+
+  &.lightbox--revealed .lightbox__item {
+    opacity: 1;
+    filter: blur(0px);
+    transition:
+      filter 0.4s cubic-bezier(0.25, 0.46, 0.45, 0.94),
+      transform 0.4s cubic-bezier(0.25, 0.46, 0.45, 0.94);
+
+    video {
+      transition: opacity 0.3s ease;
+    }
+  }
+
+  &.lightbox--revealed .lightbox__item--active {
+    transform: scale(1);
+  }
+
+  &.lightbox--revealed .lightbox__close {
+    opacity: 1;
+  }
+
+  /* Closing: fade out neighbors and backdrop before view transition */
+  &.lightbox--closing .lightbox__backdrop {
+    opacity: 0;
+    transition: opacity 0.3s cubic-bezier(0, 0.55, 0.45, 1);
+  }
+
+  &.lightbox--closing .lightbox__item:not(.lightbox__item--active) {
+    opacity: 0;
+    filter: blur(4px);
+    transform: scale(0.92);
+    transition:
+      opacity 0.3s cubic-bezier(0, 0.55, 0.45, 1),
+      filter 0.3s cubic-bezier(0, 0.55, 0.45, 1),
+      transform 0.3s cubic-bezier(0, 0.55, 0.45, 1);
+  }
+
+  &.lightbox--closing .lightbox__close {
+    opacity: 0;
+    transition: opacity 0.3s cubic-bezier(0, 0.55, 0.45, 1);
+  }
+
+  &.lightbox--closing .lightbox__item--active {
+    opacity: 0;
+    transition: opacity 0s linear 0.4s;
+  }
+}
+
+/* View Transitions — shared-element zoom between the slider panel and the lightbox */
+.lightbox__item--active {
+  view-transition-name: slider-active;
+}
+
+::view-transition-group(slider-active) {
+  animation-duration: 0.6s;
+  animation-timing-function: cubic-bezier(0.4, 0, 0, 1);
+}
+
+::view-transition-old(slider-active),
+::view-transition-new(slider-active) {
+  animation-duration: 0.6s;
+  animation-timing-function: cubic-bezier(0.4, 0, 0, 1);
+}

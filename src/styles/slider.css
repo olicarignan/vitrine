@@ -1,0 +1,122 @@
+.slider {
+  width: 100vw;
+  margin-top: 3lh;
+  margin-bottom: 4.75lh;
+  margin-left: calc(-50vw + 50%);
+
+  @media (min-width: 700px) {
+    margin-top: 4lh;
+    margin-bottom: 6.75lh;
+  }
+
+  .slider__track {
+    display: flex;
+    gap: var(--gap);
+    overflow-x: auto;
+
+    @media (max-width: 699px) {
+      gap: 0;
+    }
+
+    overflow-y: clip;
+    scroll-snap-type: x mandatory;
+    -webkit-overflow-scrolling: touch;
+    scrollbar-width: none;
+    padding-block: 48px;
+    margin-block: -48px;
+
+    &::-webkit-scrollbar {
+      display: none;
+    }
+
+    &:focus {
+      outline: none;
+    }
+  }
+
+  .slider__item {
+    flex-shrink: 0;
+    scroll-snap-align: start;
+
+    &:focus-visible {
+      outline: 2px solid var(--accent-color);
+      outline-offset: 4px;
+      border-radius: 18px;
+    }
+
+    @media (max-width: 699px) {
+      scroll-snap-align: center;
+    }
+
+    .slider__item-inner {
+      position: relative;
+      container-type: inline-size;
+      border-radius: 16px;
+      overflow: hidden;
+      filter: none;
+      transition:
+        translate 0.35s cubic-bezier(0.2, 0, 0, 1),
+        transform 0.35s cubic-bezier(0.2, 0, 0, 1),
+        filter 0.35s cubic-bezier(0.2, 0, 0, 1);
+
+      @media (max-width: 699px) {
+        transition: none;
+        border-radius: 12px;
+        will-change: transform, filter;
+      }
+
+      @media (hover: hover) {
+        &:hover {
+          translate: 0 -6px;
+          transform: scale(1.01);
+          filter: drop-shadow(0 4px 10px rgba(0, 0, 0, 0.05))
+            drop-shadow(0 2px 4px rgba(0, 0, 0, 0.02));
+        }
+      }
+    }
+
+    &.slider__item--transitioning .slider__item-inner {
+      filter: none;
+      transition: none;
+    }
+
+    img,
+    video {
+      display: block;
+      border-radius: 16px;
+      cursor:
+        url("/images/svg/cursor_plus.svg") 8 8,
+        zoom-in;
+      width: 100%;
+      object-fit: cover;
+      aspect-ratio: 3 / 2;
+    }
+
+    video {
+      position: absolute;
+      inset: 0;
+      opacity: 0;
+      transition: opacity 0.3s ease;
+    }
+
+    &.slider__item--active video {
+      opacity: 1;
+    }
+
+    &.slider__item--video-ready img {
+      opacity: 0;
+    }
+  }
+
+  .slider__meta {
+    margin-top: 0.75lh;
+
+    h3 {
+      color: var(--accent-color);
+      margin: 0;
+    }
+    p {
+      color: var(--text-color);
+    }
+  }
+}

@@ -1,0 +1,75 @@
+:root {
+  /* Tokens the components read */
+  --gap: 2rem;
+  --accent-color: #111;
+  --text-color: #666;
+  --color-text: #111; /* alias used by the lightbox close button */
+
+  /* Page theme */
+  --bg: #f4f3f0;
+
+  color-scheme: light;
+  /* `lh`-based margins in slider.css resolve against this line-height */
+  line-height: 1.4;
+  font-family:
+    ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, Helvetica,
+    Arial, sans-serif;
+
+  /* Lets the rest of the page cross-fade during the lightbox view transition */
+  view-transition-name: root;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  margin: 0;
+  padding: 0;
+}
+
+body {
+  background: var(--bg);
+  color: var(--accent-color);
+  -webkit-font-smoothing: antialiased;
+  overflow-x: hidden;
+}
+
+.page {
+  min-height: 100dvh;
+  padding: clamp(2rem, 6vw, 6rem) 0 4rem;
+}
+
+.page__header {
+  max-width: 628px;
+  margin: 0 auto;
+  padding-inline: 16px;
+}
+
+.page__header h1 {
+  margin: 0 0 0.25rem;
+  font-size: clamp(1.75rem, 4vw, 2.5rem);
+  font-weight: 600;
+  letter-spacing: -0.02em;
+}
+
+.page__header p {
+  margin: 0;
+  color: var(--text-color);
+}
+
+.slider__meta-inner {
+  font-size: 0.95rem;
+}
+
+.slider__meta h3 {
+  font-size: 0.95rem;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+}
+
+.slider__meta p {
+  font-size: 0.95rem;
+  margin: 0;
+}
