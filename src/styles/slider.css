@@ -11,6 +11,7 @@
 
   .slider__track {
     display: flex;
+    align-items: flex-end;
     gap: var(--gap);
     overflow-x: auto;
 
@@ -36,6 +37,9 @@
 
   .slider__item {
     flex-shrink: 0;
+    /* Size to the image, bounded by the max width/height set inline. */
+    width: fit-content;
+    max-width: var(--item-max-w);
     scroll-snap-align: start;
 
     &:focus-visible {
@@ -50,7 +54,6 @@
 
     .slider__item-inner {
       position: relative;
-      container-type: inline-size;
       border-radius: 16px;
       overflow: hidden;
       filter: none;
@@ -87,14 +90,22 @@
       cursor:
         url("/images/svg/cursor_plus.svg") 8 8,
         zoom-in;
-      width: 100%;
-      object-fit: cover;
-      aspect-ratio: 3 / 2;
+      /* Keep each image's native aspect ratio, bounded by the max width/height. */
+      width: auto;
+      height: auto;
+      max-width: var(--item-max-w);
+      max-height: var(--item-max-h);
     }
 
     video {
       position: absolute;
       inset: 0;
+      width: 100%;
+      height: 100%;
+      max-width: none;
+      max-height: none;
+      /* The image defines the panel's box; the video overlay fills it. */
+      object-fit: cover;
       opacity: 0;
       transition: opacity 0.3s ease;
     }

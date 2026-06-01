@@ -35,8 +35,9 @@ const itemFadeIn = {
  * @param {number}   [props.contentWidth=628] Desktop width (px) of the active panel's content column.
  * @param {number}   [props.gap=32]           Desktop gap (px) between panels.
  * @param {number}   [props.columns=4]        Notional grid columns, used only to align the meta text.
- * @param {number}   [props.metaOffsetColumns=2] Shift the meta text right by N columns on desktop.
+ * @param {number}   [props.metaOffsetColumns=0] Shift the meta text right by N columns on desktop (0 = flush with the slide).
  * @param {number}   [props.sideMargin=24]    Minimum viewport margin (px per side) the content column keeps.
+ * @param {number}   [props.maxItemHeight=520] Max height (px) of a panel; taller images scale down (keeping ratio).
  * @param {string}   [props.sizes]            `sizes` hint for the panel <img>.
  * @param {string}   [props.lightboxSizes]    `sizes` hint forwarded to the lightbox images.
  *
@@ -61,8 +62,9 @@ export function Slider({
   contentWidth = 628,
   gap = 32,
   columns = 4,
-  metaOffsetColumns = 2,
+  metaOffsetColumns = 0,
   sideMargin = 24,
+  maxItemHeight = 520,
   sizes = "(min-width: 700px) 628px, 82vw",
   lightboxSizes = "84vw",
 }) {
@@ -74,6 +76,7 @@ export function Slider({
     inset: 0,
     itemWidth: 0,
     metaInset: 0,
+    metaInsetRight: 0,
     isMobile: false,
   });
   const [lightboxOpen, setLightboxOpen] = useState(false);
@@ -94,11 +97,16 @@ export function Slider({
         const cw = Math.min(contentWidth, vw - 2 * sideMargin);
         const contentLeft = (vw - cw) / 2;
         const colWidth = (cw - (columns - 1) * gap) / columns;
+        // 12px overhang each side so the active panel breathes past the column.
+        const inset = contentLeft - 12;
         setLayout({
-          // 12px overhang each side so the active panel breathes past the column.
-          inset: contentLeft - 12,
+          inset,
           itemWidth: cw + 24,
-          metaInset: contentLeft + metaOffsetColumns * (colWidth + gap),
+          // Align the meta block to the active slide: its left edge sits under the
+          // slide (plus any optional column offset) and its right edge matches the
+          // slide's right edge, so the text spans the same width as the panel.
+          metaInset: inset + metaOffsetColumns * (colWidth + gap),
+          metaInsetRight: inset,
           isMobile: false,
         });
       } else {
@@ -108,6 +116,7 @@ export function Slider({
           inset: mobilePad,
           itemWidth: mobileItemWidth,
           metaInset: mobilePad,
+          metaInsetRight: mobilePad,
           isMobile: true,
         });
       }
@@ -212,6 +221,7 @@ export function Slider({
 
       let bestIndex = -1;
       let bestOverlap = 0;
+      let bestWidth = layout.itemWidth;
       itemEls.forEach((item, i) => {
         const rect = item.getBoundingClientRect();
         const overlap = Math.max(
@@ -221,10 +231,16 @@ export function Slider({
         if (overlap > bestOverlap) {
           bestOverlap = overlap;
           bestIndex = i;
+          bestWidth = rect.width;
         }
       });
 
-      if (bestIndex >= 0 && bestOverlap / layout.itemWidth > 0.5) {
+      // Activate once the panel fills more than half the active slot. Narrow
+      // (portrait) panels are measured against their own width so they still trip.
+      if (
+        bestIndex >= 0 &&
+        bestOverlap / Math.min(bestWidth, layout.itemWidth) > 0.5
+      ) {
         setActiveIndex(bestIndex);
       }
     });
@@ -551,7 +567,11 @@ export function Slider({
               role="button"
               tabIndex={0}
               aria-label={item.title}
-              style={{ width: `${layout.itemWidth}px`, cursor: "zoom-in" }}
+              style={{
+                "--item-max-w": `${layout.itemWidth}px`,
+                "--item-max-h": `${maxItemHeight}px`,
+                cursor: "zoom-in",
+              }}
               onClick={() => {
                 // Touch clicks (pointer capture doesn't apply to touch)
                 if (dragDistRef.current < 5) handleItemClick(i);
@@ -612,7 +632,7 @@ export function Slider({
         className="slider__meta"
         style={{
           paddingLeft: `${layout.metaInset}px`,
-          paddingRight: `${layout.metaInset}px`,
+          paddingRight: `${layout.metaInsetRight}px`,
         }}
         variants={itemFadeIn}
       >

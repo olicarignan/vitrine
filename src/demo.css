@@ -59,6 +59,13 @@ body {
   color: var(--text-color);
 }
 
+.page__status {
+  max-width: 628px;
+  margin: 4lh auto;
+  padding-inline: 16px;
+  color: var(--text-color);
+}
+
 .slider__meta-inner {
   font-size: 0.95rem;
 }

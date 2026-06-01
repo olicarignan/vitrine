@@ -5,10 +5,13 @@
   display: flex;
   align-items: center;
 
+  /* Each image keeps its native aspect ratio, scaled to fit within these bounds. */
+  --lb-max-width: 95vw;
+  --lb-max-height: calc(100dvh - 96px);
+
   @media (min-width: 700px) {
-    /* Fill available width (leaving a 20px gap + 20px peek per side), capped so
-       the height never exceeds 100vh - 40px while keeping the 3/2 aspect ratio. */
-    --lb-active-width: min(calc(100vw - 80px), calc((100dvh - 40px) * 3 / 2));
+    --lb-max-width: calc(100vw - 80px);
+    --lb-max-height: calc(100dvh - 40px);
   }
 
   .lightbox__backdrop {
@@ -24,6 +27,7 @@
   .lightbox__track {
     position: relative;
     display: flex;
+    align-items: flex-end;
     gap: 4rem;
     overflow-x: auto;
     overflow-y: hidden;
@@ -31,14 +35,10 @@
     -webkit-overflow-scrolling: touch;
     scrollbar-width: none;
     width: 100%;
-    padding-inline: 2.5vw;
-    scroll-padding-inline: 2.5vw;
-
-    @media (min-width: 700px) {
-      gap: 20px;
-      padding-inline: calc((100vw - var(--lb-active-width)) / 2);
-      scroll-padding-inline: calc((100vw - var(--lb-active-width)) / 2);
-    }
+    /* Half-viewport runway on each side so any item — even a narrow portrait —
+       can be scrolled to the center, including the first and last. Mandatory
+       snap keeps a slide centered and prevents resting in the blank space. */
+    padding-inline: 50%;
 
     &::-webkit-scrollbar {
       display: none;
@@ -47,15 +47,11 @@
 
   .lightbox__item {
     flex-shrink: 0;
-    width: min(95vw, 120dvh);
+    /* Size to the image so the native aspect ratio is preserved. */
+    width: fit-content;
     scroll-snap-align: center;
     position: relative;
     cursor: pointer;
-    container-type: inline-size;
-
-    @media (min-width: 700px) {
-      width: var(--lb-active-width);
-    }
   }
 
   &:not(.lightbox--revealed) .lightbox__item:not(.lightbox__item--active) {
@@ -71,9 +67,11 @@
   .lightbox__item img,
   .lightbox__item video {
     display: block;
-    width: 100%;
-    object-fit: cover;
-    aspect-ratio: 3 / 2;
+    /* Native aspect ratio, scaled down to fit the viewport bounds. */
+    width: auto;
+    height: auto;
+    max-width: var(--lb-max-width);
+    max-height: var(--lb-max-height);
     border-radius: 12px;
     user-select: none;
     -webkit-user-drag: none;
@@ -98,9 +96,26 @@
     opacity: 1;
   }
 
+  /* The hi-res layer is absolutely positioned over the already-sized low layer,
+     so its image must fill the picture box exactly instead of sizing itself from
+     its own (larger) intrinsic dimensions. Both layers share the same ratio, so
+     object-fit won't crop. */
+  .lightbox__img--high img {
+    width: 100%;
+    height: 100%;
+    max-width: none;
+    max-height: none;
+    object-fit: cover;
+  }
+
   .lightbox__item video {
     position: absolute;
     inset: 0;
+    width: 100%;
+    height: 100%;
+    max-width: none;
+    max-height: none;
+    object-fit: cover;
     opacity: 0;
   }
 

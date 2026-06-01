@@ -25,8 +25,10 @@ pnpm install   # or npm install
 pnpm dev       # then open the printed localhost URL
 ```
 
-The demo (`src/App.jsx`, `src/demo-data.js`) renders the slider with sample
-images from picsum.photos and two sample videos.
+The demo (`src/App.jsx`, `src/demo-data.js`) renders the slider with random
+artworks pulled live from [The Met Collection API](https://metmuseum.github.io/)
+— it searches for image-bearing works under a random term each load, so you get
+a different set every refresh.
 
 ## Use it in your project
 
