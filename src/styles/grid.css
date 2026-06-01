@@ -1,0 +1,33 @@
+/* Layout grid — brought in from oliviercarignan.
+   A centered grid with `--padding` gutter columns on each side and a content
+   area (`.subgrid`) spanning columns 2 → -2. The slider measures `.subgrid` to
+   align its active panel and caption to this same content column. */
+.grid {
+  --columns: 4;
+  --padding: 3.2rem;
+  --gap: 0.8rem;
+
+  display: grid;
+  margin-inline: auto;
+  /* Mobile: full width, so the gutters scale the inline margin with the page. */
+  max-width: none;
+  width: 100%;
+  gap: var(--gap);
+  grid-template-columns:
+    var(--padding) repeat(var(--columns), minmax(0, 1fr))
+    var(--padding);
+  row-gap: 0;
+  grid-auto-rows: min-content;
+
+  @media (min-width: 700px) {
+    --columns: 8;
+    max-width: calc(628px + (var(--padding) * 2) + (var(--gap) * 2));
+  }
+
+  .subgrid {
+    display: grid;
+    grid-column: 2 / -2;
+    grid-template-columns: repeat(var(--columns), minmax(0, 1fr));
+    gap: 0 var(--gap);
+  }
+}

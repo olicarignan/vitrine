@@ -15,8 +15,10 @@
     gap: var(--gap);
     overflow-x: auto;
 
+    /* Smaller gap on mobile so the centred panel still shows a neighbour peeking
+       inside the page margin (peek ≈ margin − gap). */
     @media (max-width: 699px) {
-      gap: 0;
+      gap: 1.6rem;
     }
 
     overflow-y: clip;
@@ -50,6 +52,11 @@
 
     @media (max-width: 699px) {
       scroll-snap-align: center;
+      /* On mobile the active panel always spans the full column width (viewport
+         minus the page margins), whatever the image's aspect ratio — so only the
+         height varies and the caption can pin to the fixed left edge. */
+      width: var(--item-max-w);
+      max-width: none;
     }
 
     .slider__item-inner {
@@ -95,6 +102,14 @@
       height: auto;
       max-width: var(--item-max-w);
       max-height: var(--item-max-h);
+
+      /* On mobile the image fills the full-width panel; height follows the ratio. */
+      @media (max-width: 699px) {
+        width: 100%;
+        height: auto;
+        max-width: none;
+        max-height: none;
+      }
     }
 
     video {

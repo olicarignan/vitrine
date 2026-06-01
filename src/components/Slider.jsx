@@ -72,17 +72,21 @@ export function Slider({
   const scrollTimer = useRef(null);
   const dragState = useRef({ isDragging: false, startX: 0, scrollLeft: 0 });
   const [activeIndex, setActiveIndex] = useState(0);
+  // Mirror of activeIndex for callbacks that must read the latest value without
+  // being re-created (openLightbox runs after an async scroll settles).
+  const activeIndexRef = useRef(0);
+  activeIndexRef.current = activeIndex;
   const [layout, setLayout] = useState({
     inset: 0,
     itemWidth: 0,
     metaInset: 0,
     metaInsetRight: 0,
+    endPad: 0,
     isMobile: false,
   });
   const [lightboxOpen, setLightboxOpen] = useState(false);
   const [sliderVideosHidden, setSliderVideosHidden] = useState(false);
   const dragDistRef = useRef(0);
-  const pendingLightbox = useRef(null);
   const externalScroll = useRef(false);
   const activeTransition = useRef(null);
   const scrollRafTicking = useRef(false);
@@ -92,31 +96,58 @@ export function Slider({
       const vw = window.innerWidth;
       const isDesktop = window.matchMedia("(min-width: 700px)").matches;
 
+      // Align to the host grid's content column when present (a `.subgrid` inside
+      // a `.grid`); otherwise fall back to the prop-driven content width so the
+      // component still works standalone.
+      const subgrid = document.querySelector(".subgrid");
+      const gridEl = subgrid?.closest(".grid") || document.querySelector(".grid");
+
       if (isDesktop) {
-        // Centered content column, clamped to keep a minimum side margin.
-        const cw = Math.min(contentWidth, vw - 2 * sideMargin);
-        const contentLeft = (vw - cw) / 2;
-        const colWidth = (cw - (columns - 1) * gap) / columns;
+        let colLeft, colWidth, cols, colGap;
+        if (subgrid && gridEl) {
+          const r = subgrid.getBoundingClientRect();
+          colLeft = r.left;
+          colWidth = r.width;
+          cols =
+            parseInt(getComputedStyle(gridEl).getPropertyValue("--columns"), 10) ||
+            columns;
+          colGap = parseFloat(getComputedStyle(subgrid).columnGap) || gap;
+        } else {
+          colWidth = Math.min(contentWidth, vw - 2 * sideMargin);
+          colLeft = (vw - colWidth) / 2;
+          cols = columns;
+          colGap = gap;
+        }
+        const oneCol = (colWidth - (cols - 1) * colGap) / cols;
         // 12px overhang each side so the active panel breathes past the column.
-        const inset = contentLeft - 12;
+        const inset = colLeft - 12;
         setLayout({
           inset,
-          itemWidth: cw + 24,
-          // Align the meta block to the active slide: its left edge sits under the
-          // slide (plus any optional column offset) and its right edge matches the
-          // slide's right edge, so the text spans the same width as the panel.
-          metaInset: inset + metaOffsetColumns * (colWidth + gap),
+          itemWidth: colWidth + 24,
+          // Caption aligns to the active panel's left edge, plus an optional indent.
+          metaInset: inset + metaOffsetColumns * (oneCol + colGap),
           metaInsetRight: inset,
+          // Trailing room so the last panel can scroll fully to the left edge.
+          endPad: vw - inset,
           isMobile: false,
         });
       } else {
-        const mobileItemWidth = vw - 32;
-        const mobilePad = (vw - mobileItemWidth) / 2;
+        // Mobile: the panel spans the full content width (viewport minus the grid's
+        // edge gutter), whatever the aspect ratio; the caption pins to its left.
+        let margin;
+        if (subgrid && gridEl) {
+          margin =
+            subgrid.getBoundingClientRect().left -
+            gridEl.getBoundingClientRect().left;
+        } else {
+          margin = sideMargin;
+        }
         setLayout({
-          inset: mobilePad,
-          itemWidth: mobileItemWidth,
-          metaInset: mobilePad,
-          metaInsetRight: mobilePad,
+          inset: margin,
+          itemWidth: vw - 2 * margin,
+          metaInset: margin,
+          metaInsetRight: margin,
+          endPad: margin,
           isMobile: true,
         });
       }
@@ -178,6 +209,10 @@ export function Slider({
       const norm = Math.min(edgeDist / (window.innerWidth * 0.3), 1);
       const inner = item.querySelector(".slider__item-inner");
       if (inner) {
+        // Anchor the scale to the edge facing the viewport centre so a neighbour
+        // keeps peeking by the same amount even as it shrinks.
+        inner.style.transformOrigin =
+          itemCenter < center ? "right center" : "left center";
         inner.style.transform = `scale(${1 - norm * 0.05})`;
         inner.style.filter = `brightness(${1 - norm * 0.15})`;
       }
@@ -263,11 +298,15 @@ export function Slider({
       track.querySelectorAll(".slider__item-inner").forEach((inner) => {
         inner.style.transform = "";
         inner.style.filter = "";
+        inner.style.transformOrigin = "";
       });
     }
   }, [layout.isMobile, updateMobileScales]);
 
-  const openLightbox = useCallback((index) => {
+  // Always opens on the slider's current active item — the single source of
+  // truth shared with the lightbox — so the two stay in sync.
+  const openLightbox = useCallback(() => {
+    const index = activeIndexRef.current;
     const sliderItems = trackRef.current?.querySelectorAll(".slider__item");
     if (!sliderItems?.[index]) return;
     if (activeTransition.current) return;
@@ -300,11 +339,21 @@ export function Slider({
   const handleItemClick = useCallback(
     (index) => {
       if (index === activeIndex) {
-        openLightbox(index);
-      } else {
-        pendingLightbox.current = index;
-        scrollToIndex(index);
+        openLightbox();
+        return;
       }
+      // Non-active item: scroll it into the active position first, then open the
+      // lightbox once the scroll animation finishes — so the lightbox opens
+      // already in sync with the slider.
+      const track = trackRef.current;
+      scrollToIndex(index);
+      const open = () => {
+        clearTimeout(fallback);
+        track?.removeEventListener("scrollend", open);
+        openLightbox();
+      };
+      const fallback = setTimeout(open, 600);
+      track?.addEventListener("scrollend", open, { once: true });
     },
     [activeIndex, openLightbox, scrollToIndex],
   );
@@ -511,19 +560,6 @@ export function Slider({
     }
   }, [activeIndex]);
 
-  // Open lightbox after pending scroll settles
-  useEffect(() => {
-    if (
-      pendingLightbox.current !== null &&
-      activeIndex === pendingLightbox.current
-    ) {
-      const idx = pendingLightbox.current;
-      pendingLightbox.current = null;
-      // Small delay to let scroll fully settle
-      requestAnimationFrame(() => openLightbox(idx));
-    }
-  }, [activeIndex, openLightbox]);
-
   const handleLightboxActiveChange = useCallback(
     (index) => {
       setActiveIndex(index);
@@ -552,7 +588,7 @@ export function Slider({
         onPointerCancel={handlePointerUp}
         style={{
           paddingLeft: `${layout.inset}px`,
-          paddingRight: `${layout.inset}px`,
+          paddingRight: `${layout.endPad}px`,
           scrollPaddingLeft: layout.isMobile ? undefined : `${layout.inset}px`,
           touchAction: "pan-x pan-y",
         }}

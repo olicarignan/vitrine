@@ -9,6 +9,14 @@
   --lb-max-width: 95vw;
   --lb-max-height: calc(100dvh - 96px);
 
+  /* Mobile: the active panel spans the full available width — i.e. the viewport
+     minus the gap and a peek of the neighbouring item on each side. These match
+     the slider's mobile metrics (page gutter 4rem = gap 1.6rem + peek 2.4rem) so
+     the shared-element zoom lines up. */
+  --lb-gap: 1.6rem;
+  --lb-peek: 2.4rem;
+  --lb-item-width: calc(100vw - 2 * (var(--lb-gap) + var(--lb-peek)));
+
   @media (min-width: 700px) {
     --lb-max-width: calc(100vw - 80px);
     --lb-max-height: calc(100dvh - 40px);
@@ -28,7 +36,12 @@
     position: relative;
     display: flex;
     align-items: flex-end;
-    gap: 4rem;
+    gap: 6.4rem;
+
+    @media (max-width: 699px) {
+      gap: var(--lb-gap);
+    }
+
     overflow-x: auto;
     overflow-y: hidden;
     scroll-snap-type: x mandatory;
@@ -52,6 +65,12 @@
     scroll-snap-align: center;
     position: relative;
     cursor: pointer;
+
+    /* Mobile: every panel is the same full available width, whatever the image
+       ratio, so the peek and snapping stay uniform across slides. */
+    @media (max-width: 699px) {
+      width: var(--lb-item-width);
+    }
   }
 
   &:not(.lightbox--revealed) .lightbox__item:not(.lightbox__item--active) {
@@ -78,6 +97,16 @@
 
     @media screen {
       border-radius: 16px;
+    }
+
+    /* Mobile: fill the full-width panel; a too-tall portrait crops to the
+       viewport height rather than narrowing the panel. */
+    @media (max-width: 699px) {
+      width: 100%;
+      height: auto;
+      max-width: none;
+      max-height: var(--lb-max-height);
+      object-fit: cover;
     }
   }
 
@@ -139,15 +168,15 @@
     @media (max-width: 699px) {
       display: block;
       position: fixed;
-      bottom: 2rem;
+      bottom: 3.2rem;
       left: 50%;
       transform: translateX(-50%);
       border: none;
       border-radius: 999px;
       z-index: 10;
-      padding: 1.25rem;
+      padding: 2rem;
       color: var(--color-text);
-      font-size: 0.875rem;
+      font-size: 1.4rem;
       letter-spacing: 0.05em;
       cursor: pointer;
       opacity: 0;

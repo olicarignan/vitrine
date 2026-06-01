@@ -1,6 +1,12 @@
 "use client";
 
-import { useRef, useState, useEffect, useCallback } from "react";
+import {
+  useRef,
+  useState,
+  useEffect,
+  useLayoutEffect,
+  useCallback,
+} from "react";
 import { motion } from "motion/react";
 
 /**
@@ -26,7 +32,10 @@ export function Lightbox({
   const [activeIndex, setActiveIndex] = useState(initialIndex);
   const [, setIsDragging] = useState(false);
   const dragDistRef = useRef(0);
-  const hasInitialized = useRef(false);
+  // The index to open on, captured once at mount. The `activeIndex` prop tracks
+  // the slider and changes as the user scrolls the lightbox, so we can't use it
+  // to (re)position — that would fight the user's scrolling.
+  const openIndexRef = useRef(initialIndex);
   const [neighborsRevealed, setNeighborsRevealed] = useState(false);
   const revealedRef = useRef(false);
   const scrollRafTicking = useRef(false);
@@ -65,20 +74,17 @@ export function Lightbox({
     };
   }, []);
 
-  // Scroll to initial position on mount
-  useEffect(() => {
+  // Center the active item before the first paint, so the lightbox opens
+  // already in sync with the slider rather than mounting at the first item and
+  // scrolling into place afterwards (which iOS Safari would also snap back).
+  // The slider's image is already loaded, so the item has its width here.
+  useLayoutEffect(() => {
     const track = trackRef.current;
-    if (!track || hasInitialized.current) return;
-    hasInitialized.current = true;
-    const itemEls = track.querySelectorAll(".lightbox__item");
-    if (itemEls[initialIndex]) {
-      itemEls[initialIndex].scrollIntoView({
-        behavior: "instant",
-        block: "nearest",
-        inline: "center",
-      });
-    }
-  }, [initialIndex]);
+    if (!track) return;
+    const el = track.querySelectorAll(".lightbox__item")[openIndexRef.current];
+    if (!el) return;
+    track.scrollLeft = el.offsetLeft - (track.clientWidth - el.offsetWidth) / 2;
+  }, []);
 
   // Scroll handler — rAF-batched. Only updates inline styles on items within ±2 of the active.
   const handleScroll = useCallback(() => {

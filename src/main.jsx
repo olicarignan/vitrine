@@ -2,6 +2,7 @@ import { createRoot } from "react-dom/client";
 import App from "./App.jsx";
 
 import "./demo.css";
+import "./styles/grid.css";
 import "./styles/slider.css";
 import "./styles/lightbox.css";
 

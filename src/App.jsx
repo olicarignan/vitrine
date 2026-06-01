@@ -17,14 +17,22 @@ export default function App() {
 
   return (
     <main className="page">
-      <header className="page__header">
-        <h1>Selected Work</h1>
-        <p>Drag or scroll the panels. Click the centered one to zoom in.</p>
-      </header>
+      <div className="grid">
+        <div className="subgrid">
+          <header className="page__header">
+            <h1>Gallery</h1>
+            <p>Drag, scroll or arrow keys to navigate. Click to open lightbox.</p>
+          </header>
+        </div>
+      </div>
       {projects ? (
         <Slider items={projects} />
       ) : (
-        <p className="page__status">Loading artworks from The Met…</p>
+        <div className="grid">
+          <div className="subgrid">
+            <p className="page__status">Loading artworks from The Met…</p>
+          </div>
+        </div>
       )}
     </main>
   );
