@@ -15,8 +15,10 @@ Built with React 19, [`motion`](https://motion.dev), and the native
 - Shared-element view transition between the panel and the lightbox image.
 - Optional looping muted **video** per panel, autoplaying only while active.
 - Progressive hi-res image swap in the lightbox (low-res placeholder → hi-res).
-- Mobile-tuned: centered snap, depth scaling, and a floating close button.
-- Keyboard support in the lightbox (`←` / `→` / `Esc`).
+- Mobile-tuned: centered snap, depth scaling, and a floating prev / close / next
+  control bar.
+- Keyboard navigation: `←` / `→` move the slider while it's focused or hovered,
+  and drive the lightbox (`←` / `→` / `Esc`) while it's open.
 
 ## Run the demo
 
@@ -61,9 +63,9 @@ The stylesheets read a few CSS custom properties — define them on `:root` (see
 | Token             | Used for                                    |
 | ----------------- | ------------------------------------------- |
 | `--gap`           | gap between slider panels (desktop)         |
-| `--accent-color`  | meta title color, focus ring, mobile button |
+| `--accent-color`  | meta title color, focus ring, mobile control-bar background |
 | `--text-color`    | meta subtitle color                         |
-| `--color-text`    | mobile close-button icon color              |
+| `--color-text`    | mobile control-bar icon color (close + arrows) |
 
 To get the rest of the page to cross-fade during the zoom, also set
 `view-transition-name: root` on `:root`.
@@ -76,10 +78,28 @@ To get the rest of the page to cross-fade during the zoom, also set
 | `contentWidth`      | `number` | `628`                              | Desktop width (px) of the active panel's content column.           |
 | `gap`               | `number` | `32`                               | Desktop gap (px) between panels.                                   |
 | `columns`           | `number` | `4`                                | Notional grid columns — only used to align the meta text.          |
-| `metaOffsetColumns` | `number` | `2`                                | Shift the meta text right by N columns on desktop.                 |
+| `metaOffsetColumns` | `number` | `0`                                | Shift the meta text right by N columns on desktop (0 = flush).     |
 | `sideMargin`        | `number` | `24`                               | Minimum viewport margin (px/side) the content column keeps.        |
+| `maxItemHeight`     | `number` | `520`                              | Max height (px) of a panel; taller images scale down keeping ratio.|
 | `sizes`             | `string` | `(min-width: 700px) 628px, 82vw`   | `sizes` hint for the panel `<img>`.                                |
 | `lightboxSizes`     | `string` | `84vw`                             | `sizes` hint forwarded to the lightbox images.                     |
+
+## `<Lightbox>` props (internal)
+
+The `<Lightbox>` is normally rendered and driven by `<Slider>` during the
+shared-element zoom — you don't usually mount it yourself. If you do, these are
+its props:
+
+| Prop                  | Type       | Default | Description                                          |
+| --------------------- | ---------- | ------- | ---------------------------------------------------- |
+| `items`               | `Item[]`   | —       | Same item array passed to `<Slider>`.                |
+| `activeIndex`         | `number`   | —       | Index to open on.                                    |
+| `sizes`               | `string`   | `84vw`  | `sizes` hint for the images.                         |
+| `onActiveIndexChange` | `Function` | —       | Called with the new index as the user scrolls.       |
+| `onClose`             | `Function` | —       | Called to dismiss the lightbox.                      |
+
+On mobile (`< 700px`) the lightbox shows a fixed control bar with prev / close /
+next buttons; prev and next dim and disable at the first and last slide.
 
 ## Item shape
 

@@ -69,6 +69,8 @@ export function Slider({
   lightboxSizes = "84vw",
 }) {
   const trackRef = useRef(null);
+  const rootRef = useRef(null);
+  const hoveredRef = useRef(false);
   const scrollTimer = useRef(null);
   const dragState = useRef({ isDragging: false, startX: 0, scrollLeft: 0 });
   const [activeIndex, setActiveIndex] = useState(0);
@@ -187,6 +189,36 @@ export function Slider({
     },
     [layout.itemWidth, layout.isMobile],
   );
+
+  // Arrow-key navigation — only while the slider is hovered or holds focus, so
+  // arrow keys still scroll the page normally elsewhere. The lightbox owns the
+  // keys while it is open.
+  useEffect(() => {
+    const handleKeyDown = (e) => {
+      if (e.key !== "ArrowRight" && e.key !== "ArrowLeft") return;
+      if (lightboxOpen) return;
+      const active =
+        hoveredRef.current ||
+        (rootRef.current && rootRef.current.contains(document.activeElement));
+      if (!active) return;
+
+      if (e.key === "ArrowRight") {
+        const next = Math.min(activeIndex + 1, items.length - 1);
+        if (next !== activeIndex) {
+          e.preventDefault();
+          scrollToIndex(next);
+        }
+      } else {
+        const prev = Math.max(activeIndex - 1, 0);
+        if (prev !== activeIndex) {
+          e.preventDefault();
+          scrollToIndex(prev);
+        }
+      }
+    };
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [activeIndex, items.length, lightboxOpen, scrollToIndex]);
 
   const updateMobileScales = useCallback((track) => {
     const itemEls = track.querySelectorAll(".slider__item");
@@ -577,7 +609,13 @@ export function Slider({
   const active = items[activeIndex];
 
   return (
-    <motion.div className="slider" variants={staggerItems}>
+    <motion.div
+      className="slider"
+      ref={rootRef}
+      variants={staggerItems}
+      onPointerEnter={() => (hoveredRef.current = true)}
+      onPointerLeave={() => (hoveredRef.current = false)}
+    >
       <motion.div
         className="slider__track"
         ref={trackRef}
