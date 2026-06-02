@@ -26,7 +26,7 @@ export interface SliderItem {
   video?: string;
 }
 
-/** Props passed to the optional `Caption` component (e.g. `text-morph`'s `TextMorph`). */
+/** Props passed to the `Caption` component (matching metamorphosis's `TextMorph`). */
 export interface CaptionProps {
   as?: ElementType;
   children?: ReactNode;
@@ -53,13 +53,16 @@ export interface SliderProps {
   lightboxSizes?: string;
   /**
    * Component used to render the meta title/subtitle. Receives `as` and
-   * `children`. Defaults to plain `<h3>` / `<p>`; pass `text-morph`'s
-   * `TextMorph` (or your own) to animate the caption.
+   * `children`. Defaults to metamorphosis's morphing `TextMorph`; pass
+   * `PlainCaption` (or your own) to opt out of the animation.
    */
   Caption?: ComponentType<CaptionProps>;
 }
 
 export declare const Slider: ComponentType<SliderProps>;
+
+/** Bare caption renderer (no animation). Pass as `Caption` to opt out of morphing. */
+export declare const PlainCaption: ComponentType<CaptionProps>;
 
 export interface LightboxProps {
   /** Same item array passed to `<Slider>`. */

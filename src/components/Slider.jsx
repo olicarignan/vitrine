@@ -3,11 +3,15 @@
 import { useRef, useState, useEffect, useCallback } from "react";
 import { flushSync } from "react-dom";
 import { motion, AnimatePresence } from "motion/react";
+import { TextMorph } from "metamorphosis/react";
 import { Lightbox } from "./Lightbox";
 
-// Default caption renderer: a plain element, no extra dependency. Pass a
-// `Caption` component (e.g. `text-morph`'s `<TextMorph>`) to animate the text.
-const PlainCaption = ({ as: Tag = "span", children }) => <Tag>{children}</Tag>;
+// Plain caption renderer: a bare element with no animation. Pass it (or any
+// component taking `as` + `children`) as the `Caption` prop to opt out of the
+// default morphing caption.
+export const PlainCaption = ({ as: Tag = "span", children }) => (
+  <Tag>{children}</Tag>
+);
 
 const staggerItems = {
   initial: {},
@@ -43,6 +47,7 @@ const itemFadeIn = {
  * @param {number}   [props.maxItemHeight=520] Max height (px) of a panel; taller images scale down (keeping ratio).
  * @param {string}   [props.sizes]            `sizes` hint for the panel <img>.
  * @param {string}   [props.lightboxSizes]    `sizes` hint forwarded to the lightbox images.
+ * @param {React.ElementType} [props.Caption]  Caption renderer (takes `as` + `children`). Defaults to metamorphosis's morphing `<TextMorph>`; pass `PlainCaption` (or your own) to opt out.
  *
  * Item shape (all image fields are plain strings — bring your own CMS/transform):
  * {
@@ -70,7 +75,7 @@ export function Slider({
   maxItemHeight = 520,
   sizes = "(min-width: 700px) 628px, 82vw",
   lightboxSizes = "84vw",
-  Caption = PlainCaption,
+  Caption = TextMorph,
 }) {
   const trackRef = useRef(null);
   const rootRef = useRef(null);

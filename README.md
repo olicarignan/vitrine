@@ -7,10 +7,11 @@ can drop into any React project — no host grid system required.
 Built with React 19, [`motion`](https://motion.dev), and the native
 [View Transitions API](https://developer.mozilla.org/en-US/docs/Web/API/View_Transitions_API)
 (progressive enhancement — falls back to a plain open/close where unsupported).
-The caption is plain text by default with no extra dependency; pass a component
-to the optional `Caption` prop to animate it. The demo uses
+The caption morphs between projects by default, powered by
 [`metamorphosis`](https://github.com/olicarignan/metamorphosis) — a
-dependency-free animated-text component — for letter morphing.
+dependency-free animated-text component that comes along as a dependency. Pass
+the bundled `PlainCaption` (or your own component) to the `Caption` prop to opt
+out of the animation.
 
 ## Repo layout
 
@@ -54,13 +55,15 @@ every refresh.
 pnpm add github:olicarignan/vitrine
 ```
 
-`react` and `react-dom` are peer dependencies; `motion` comes along as a
-dependency. The package builds itself from source on install (a `prepare`
-script runs `tsup`). pnpm (v10+) requires git deps with build scripts to be
-allowlisted, so add this to your `package.json`:
+`react` and `react-dom` are peer dependencies; `motion` and
+[`metamorphosis`](https://github.com/olicarignan/metamorphosis) (the morphing
+caption) come along as dependencies. Both vitrine and metamorphosis build
+themselves from source on install (a `prepare` script runs `tsup`). pnpm (v10+)
+requires git deps with build scripts to be allowlisted, so add this to your
+`package.json`:
 
 ```json
-"pnpm": { "onlyBuiltDependencies": ["vitrine"] }
+"pnpm": { "onlyBuiltDependencies": ["vitrine", "metamorphosis"] }
 ```
 
 Import the component and its stylesheet once, then render with your items:
@@ -75,32 +78,20 @@ import "vitrine/styles.css";
 The stylesheet is self-contained — the custom zoom cursors are inlined as data
 URIs, so there are no asset files to host.
 
-### Optional: animated caption
+### Plain (non-animated) caption
 
-The meta caption renders as plain `<h3>` / `<p>` by default. To animate it
-(letter morphing, as in the demo), pass any component that accepts an `as` tag
-and `children` to the `Caption` prop. The demo uses `metamorphosis`:
-
-```bash
-pnpm add github:olicarignan/metamorphosis
-```
-
-It's also a self-building git dependency, so allowlist it too:
-
-```json
-"pnpm": { "onlyBuiltDependencies": ["vitrine", "metamorphosis"] }
-```
-
-Then pass it in:
+The meta caption morphs between projects by default (letter morphing via
+`metamorphosis`). To render it as plain `<h3>` / `<p>` instead, pass the bundled
+`PlainCaption` to the `Caption` prop:
 
 ```jsx
-import { TextMorph } from "metamorphosis/react";
+import { Slider, PlainCaption } from "vitrine";
 
-<Slider items={items} Caption={TextMorph} />;
+<Slider items={items} Caption={PlainCaption} />;
 ```
 
-Any component with the same `({ as, children })` contract works — bring your
-own.
+Any component with the `({ as, children })` contract works as a `Caption` —
+bring your own.
 
 ### Required CSS tokens
 
@@ -130,7 +121,7 @@ To get the rest of the page to cross-fade during the zoom, also set
 | `maxItemHeight`     | `number` | `520`                              | Max height (px) of a panel; taller images scale down keeping ratio.|
 | `sizes`             | `string` | `(min-width: 700px) 628px, 82vw`   | `sizes` hint for the panel `<img>`.                                |
 | `lightboxSizes`     | `string` | `84vw`                             | `sizes` hint forwarded to the lightbox images.                     |
-| `Caption`           | `Component` | plain `<h3>`/`<p>`              | Component used to render the meta title/subtitle. Receives `as` and `children`. Pass `text-morph`'s `TextMorph` (or your own) to animate. |
+| `Caption`           | `Component` | `TextMorph`                    | Component used to render the meta title/subtitle. Receives `as` and `children`. Defaults to metamorphosis's morphing `TextMorph`; pass `PlainCaption` (or your own) to opt out. |
 
 ## `<Lightbox>` props (internal)
 
