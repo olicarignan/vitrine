@@ -2,7 +2,7 @@
 
 import { useRef, useState, useEffect, useCallback } from "react";
 import { flushSync } from "react-dom";
-import { motion, AnimatePresence } from "motion/react";
+import { motion, AnimatePresence, useSpring, useTransform, motionValue } from "motion/react";
 import { TextMorph } from "metamorphosis/react";
 import { Lightbox } from "./Lightbox";
 
@@ -65,6 +65,21 @@ const itemFadeIn = {
  *   video,               // optional: looping muted video URL, autoplays when active
  * }
  */
+
+function ItemInner({ normMV, originMV, isMobile, children }) {
+  const smooth = useSpring(normMV, { stiffness: 400, damping: 35 });
+  const scale = useTransform(smooth, [0, 1], [1, 0.95]);
+  const filter = useTransform(smooth, (n) => `brightness(${1 - n * 0.15})`);
+  return (
+    <motion.div
+      className="slider__item-inner"
+      style={isMobile ? { scale, filter, transformOrigin: originMV } : undefined}
+    >
+      {children}
+    </motion.div>
+  );
+}
+
 export function Slider({
   items,
   contentWidth = 628,
@@ -101,6 +116,16 @@ export function Slider({
   const externalScroll = useRef(false);
   const activeTransition = useRef(null);
   const scrollRafTicking = useRef(false);
+  const itemNormMVs = useRef([]);
+  const itemOriginMVs = useRef([]);
+
+  // Create motion values for any new items
+  if (itemNormMVs.current.length < items.length) {
+    for (let i = itemNormMVs.current.length; i < items.length; i++) {
+      itemNormMVs.current.push(motionValue(0));
+      itemOriginMVs.current.push(motionValue("center bottom"));
+    }
+  }
 
   useEffect(() => {
     const measure = () => {
@@ -248,15 +273,10 @@ export function Slider({
       const halfItem = rect.width / 2;
       const edgeDist = Math.max(0, dist - halfItem);
       const norm = Math.min(edgeDist / (window.innerWidth * 0.3), 1);
-      const inner = item.querySelector(".slider__item-inner");
-      if (inner) {
-        // Anchor the scale to the edge facing the viewport centre so a neighbour
-        // keeps peeking by the same amount even as it shrinks.
-        inner.style.transformOrigin =
-          itemCenter < center ? "right bottom" : "left bottom";
-        inner.style.transform = `scale(${1 - norm * 0.05})`;
-        inner.style.filter = `brightness(${1 - norm * 0.15})`;
-      }
+      itemNormMVs.current[i]?.set(norm);
+      itemOriginMVs.current[i]?.set(
+        itemCenter < center ? "right bottom" : "left bottom",
+      );
     });
 
     return closest;
@@ -336,11 +356,7 @@ export function Slider({
     if (layout.isMobile) {
       requestAnimationFrame(() => updateMobileScales(track));
     } else {
-      track.querySelectorAll(".slider__item-inner").forEach((inner) => {
-        inner.style.transform = "";
-        inner.style.filter = "";
-        inner.style.transformOrigin = "";
-      });
+      itemNormMVs.current.forEach((mv) => mv.set(0));
     }
   }, [layout.isMobile, updateMobileScales]);
 
@@ -666,7 +682,11 @@ export function Slider({
                 }
               }}
             >
-              <div className="slider__item-inner">
+              <ItemInner
+                normMV={itemNormMVs.current[i]}
+                originMV={itemOriginMVs.current[i]}
+                isMobile={layout.isMobile}
+              >
                 <picture>
                   {item.webpSrcSet && (
                     <source
@@ -706,7 +726,7 @@ export function Slider({
                     draggable={false}
                   />
                 )}
-              </div>
+              </ItemInner>
             </motion.div>
           );
         })}
