@@ -253,7 +253,7 @@ export function Slider({
         // Anchor the scale to the edge facing the viewport centre so a neighbour
         // keeps peeking by the same amount even as it shrinks.
         inner.style.transformOrigin =
-          itemCenter < center ? "right center" : "left center";
+          itemCenter < center ? "right bottom" : "left bottom";
         inner.style.transform = `scale(${1 - norm * 0.05})`;
         inner.style.filter = `brightness(${1 - norm * 0.15})`;
       }
