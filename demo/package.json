@@ -10,10 +10,11 @@
     "preview": "vite preview"
   },
   "dependencies": {
+    "@vercel/analytics": "^2.0.1",
+    "metamorphosis": "github:olicarignan/metamorphosis",
     "motion": "^12.19.1",
     "react": "^19.0.0",
-    "react-dom": "^19.0.0",
-    "metamorphosis": "github:olicarignan/metamorphosis"
+    "react-dom": "^19.0.0"
   },
   "devDependencies": {
     "@vitejs/plugin-react": "^4.3.4",
