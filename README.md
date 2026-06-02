@@ -55,7 +55,7 @@ every refresh.
 pnpm add github:olicarignan/vitrine
 ```
 
-`react` and `react-dom` are peer dependencies; `motion` and
+`react` and `react-dom` (`>=18`) are peer dependencies; `motion` and
 [`metamorphosis`](https://github.com/olicarignan/metamorphosis) (the morphing
 caption) come along as dependencies. Both vitrine and metamorphosis build
 themselves from source on install (a `prepare` script runs `tsup`). pnpm (v10+)
