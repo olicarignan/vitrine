@@ -1,5 +1,5 @@
 {
-  "name": "slider-lightbox",
+  "name": "vitrine",
   "version": "0.1.0",
   "description": "A draggable project slider with a shared-element zoom lightbox for React. Self-contained, prop-driven, install from GitHub.",
   "main": "dist/index.js",
@@ -46,6 +46,6 @@
   },
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/olicarignan/slider-lightbox.git"
+    "url": "git+https://github.com/olicarignan/vitrine.git"
   }
 }

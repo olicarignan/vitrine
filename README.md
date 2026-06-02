@@ -1,4 +1,4 @@
-# Slider + Lightbox
+# Vitrine
 
 A draggable horizontal project slider with a shared-element zoom into a
 fullscreen lightbox. Extracted as a self-contained, prop-driven component so it
@@ -51,7 +51,7 @@ every refresh.
 ## Install
 
 ```bash
-pnpm add github:olicarignan/slider-lightbox
+pnpm add github:olicarignan/vitrine
 ```
 
 `react` and `react-dom` are peer dependencies; `motion` comes along as a
@@ -60,14 +60,14 @@ script runs `tsup`). pnpm (v10+) requires git deps with build scripts to be
 allowlisted, so add this to your `package.json`:
 
 ```json
-"pnpm": { "onlyBuiltDependencies": ["slider-lightbox"] }
+"pnpm": { "onlyBuiltDependencies": ["vitrine"] }
 ```
 
 Import the component and its stylesheet once, then render with your items:
 
 ```jsx
-import { Slider } from "slider-lightbox";
-import "slider-lightbox/styles.css";
+import { Slider } from "vitrine";
+import "vitrine/styles.css";
 
 <Slider items={items} />;
 ```
@@ -88,7 +88,7 @@ pnpm add github:olicarignan/metamorphosis
 It's also a self-building git dependency, so allowlist it too:
 
 ```json
-"pnpm": { "onlyBuiltDependencies": ["slider-lightbox", "metamorphosis"] }
+"pnpm": { "onlyBuiltDependencies": ["vitrine", "metamorphosis"] }
 ```
 
 Then pass it in:

@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { TextMorph } from "metamorphosis/react";
 // Import the library straight from source — the demo doubles as a smoke test of
-// the package's public entry. Consumers instead import from "slider-lightbox".
+// the package's public entry. Consumers instead import from "vitrine".
 import { Slider } from "../../src/index.jsx";
 import { SliderSkeleton } from "./SliderSkeleton.jsx";
 import { fetchRandomProjects } from "./demo-data.js";
@@ -42,12 +42,12 @@ export default function App() {
             <h2>Use it in your project</h2>
             <p>Install from GitHub (React and motion come along as deps):</p>
             <pre>
-              <code>pnpm add github:olicarignan/slider-lightbox</code>
+              <code>pnpm add github:olicarignan/vitrine</code>
             </pre>
             <p>Import the styles once, then render the slider with your items:</p>
             <pre>
-              <code>{`import { Slider } from "slider-lightbox";
-import "slider-lightbox/styles.css";
+              <code>{`import { Slider } from "vitrine";
+import "vitrine/styles.css";
 
 <Slider items={items} />;`}</code>
             </pre>

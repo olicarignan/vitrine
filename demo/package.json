@@ -1,9 +1,9 @@
 {
-  "name": "slider-lightbox-demo",
+  "name": "vitrine-demo",
   "private": true,
   "version": "0.0.0",
   "type": "module",
-  "description": "Local playground for slider-lightbox — imports the library source directly.",
+  "description": "Local playground for vitrine — imports the library source directly.",
   "scripts": {
     "dev": "vite",
     "build": "vite build",
