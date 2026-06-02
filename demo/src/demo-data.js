@@ -113,13 +113,18 @@ async function fetchObject(id) {
   }
 }
 
+function stripHtml(str) {
+  return str ? str.replace(/<[^>]*>/g, "") : str;
+}
+
 function toItem(o) {
   const metaParts = [o.artistDisplayName, o.objectDate].filter(Boolean);
+  const title = stripHtml(o.title);
   return {
     id: o.objectID,
-    title: o.title || "Untitled",
+    title: title || "Untitled",
     meta: metaParts.join(" · "),
-    alt: o.artistDisplayName ? `${o.title}, ${o.artistDisplayName}` : o.title,
+    alt: o.artistDisplayName ? `${title}, ${o.artistDisplayName}` : title,
     // web-large for the panel/base layer; the original feeds the lightbox's
     // progressive hi-res upgrade.
     src: o.primaryImageSmall,
