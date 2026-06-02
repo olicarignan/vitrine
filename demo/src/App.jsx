@@ -35,7 +35,7 @@ export default function App() {
       <div className="grid">
         <div className="subgrid">
           <header className="page__header">
-            <h1>Gallery</h1>
+            <h1>vitrine</h1>
             <p>
               Drag, scroll or arrow keys to navigate. Click to open lightbox.
             </p>
