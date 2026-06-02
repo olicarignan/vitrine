@@ -55,24 +55,18 @@ import "vitrine/styles.css";
 
 <Slider items={items} />;`}</code>
             </pre>
-            <p>
-              The caption morphs between projects out of the box. To render it
-              as plain text instead, pass the bundled <code>PlainCaption</code>{" "}
-              (or your own component) to the <code>Caption</code> prop:
+            <p className="install__link">
+              For documentation, check the project on{" "}
+              <a
+                href="https://github.com/olicarignan/vitrine"
+                target="_blank"
+                rel="noopener noreferrer"
+              >
+                Github
+              </a>
             </p>
-            <pre>
-              <code>{`import { Slider, PlainCaption } from "vitrine";
-
-<Slider items={items} Caption={PlainCaption} />;`}</code>
-            </pre>
           </section>
           <section className="credits">
-            <IconLink
-              href="https://github.com/olicarignan/metamorphosis"
-              icon={<GitHubIcon />}
-            >
-              GitHub
-            </IconLink>
             <div className="credit">
               <span>Made by</span>
               <IconLink href="https://oliviercarignan.com">
