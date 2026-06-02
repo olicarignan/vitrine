@@ -1,22 +1,51 @@
 {
   "name": "slider-lightbox",
-  "private": true,
   "version": "0.1.0",
-  "type": "module",
-  "description": "A draggable project slider with a shared-element zoom lightbox. Self-contained, prop-driven, drop into any React project.",
+  "description": "A draggable project slider with a shared-element zoom lightbox for React. Self-contained, prop-driven, install from GitHub.",
+  "main": "dist/index.js",
+  "module": "dist/index.mjs",
+  "types": "index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./index.d.ts",
+      "import": "./dist/index.mjs",
+      "require": "./dist/index.js"
+    },
+    "./styles.css": "./dist/styles.css"
+  },
+  "files": [
+    "dist",
+    "index.d.ts"
+  ],
+  "sideEffects": [
+    "**/*.css"
+  ],
+  "keywords": [
+    "react",
+    "slider",
+    "carousel",
+    "lightbox",
+    "gallery",
+    "view-transitions"
+  ],
   "scripts": {
-    "dev": "vite",
-    "build": "vite build",
-    "preview": "vite preview"
+    "build": "tsup",
+    "dev": "tsup --watch",
+    "prepare": "tsup"
+  },
+  "peerDependencies": {
+    "react": ">=18",
+    "react-dom": ">=18"
   },
   "dependencies": {
-    "motion": "^12.19.1",
-    "react": "^19.0.0",
-    "react-dom": "^19.0.0",
-    "torph": "^0.0.9"
+    "motion": "^12.19.1"
   },
   "devDependencies": {
-    "@vitejs/plugin-react": "^4.3.4",
-    "vite": "^6.0.7"
+    "tsup": "^8.5.0",
+    "typescript": "^5.9.3"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/olicarignan/slider-lightbox.git"
   }
 }

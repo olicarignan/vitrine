@@ -1,0 +1,4 @@
+/* Combined stylesheet for the Slider + Lightbox. Import once:
+   `import "slider-lightbox/styles.css";` */
+@import "./styles/slider.css";
+@import "./styles/lightbox.css";

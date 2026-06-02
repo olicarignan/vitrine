@@ -3,8 +3,11 @@
 import { useRef, useState, useEffect, useCallback } from "react";
 import { flushSync } from "react-dom";
 import { motion, AnimatePresence } from "motion/react";
-import { TextMorph } from "torph/react";
 import { Lightbox } from "./Lightbox";
+
+// Default caption renderer: a plain element, no extra dependency. Pass a
+// `Caption` component (e.g. `text-morph`'s `<TextMorph>`) to animate the text.
+const PlainCaption = ({ as: Tag = "span", children }) => <Tag>{children}</Tag>;
 
 const staggerItems = {
   initial: {},
@@ -67,6 +70,7 @@ export function Slider({
   maxItemHeight = 520,
   sizes = "(min-width: 700px) 628px, 82vw",
   lightboxSizes = "84vw",
+  Caption = PlainCaption,
 }) {
   const trackRef = useRef(null);
   const rootRef = useRef(null);
@@ -711,9 +715,9 @@ export function Slider({
         variants={itemFadeIn}
       >
         <div className="slider__meta-inner">
-          <TextMorph as="h3">{active?.title}</TextMorph>
+          <Caption as="h3">{active?.title}</Caption>
           <br />
-          <TextMorph as="p">{active?.meta}</TextMorph>
+          <Caption as="p">{active?.meta}</Caption>
         </div>
       </motion.div>
       <AnimatePresence>

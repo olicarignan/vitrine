@@ -7,6 +7,20 @@ can drop into any React project — no host grid system required.
 Built with React 19, [`motion`](https://motion.dev), and the native
 [View Transitions API](https://developer.mozilla.org/en-US/docs/Web/API/View_Transitions_API)
 (progressive enhancement — falls back to a plain open/close where unsupported).
+The caption is plain text by default with no extra dependency; pass a component
+to the optional `Caption` prop to animate it. The demo uses
+[`metamorphosis`](https://github.com/olicarignan/metamorphosis) — a
+dependency-free animated-text component — for letter morphing.
+
+## Repo layout
+
+This repo is both the published library and a live demo:
+
+- **`src/`** — the library. `Slider`, `Lightbox`, and the stylesheets. Built to
+  `dist/` with [`tsup`](https://tsup.egoist.dev) (ESM + CJS) and installed
+  straight from GitHub.
+- **`demo/`** — a standalone Vite app that imports the library from `../src` and
+  doubles as a smoke test of the public entry. It has its own `package.json`.
 
 ## Features
 
@@ -23,42 +37,75 @@ Built with React 19, [`motion`](https://motion.dev), and the native
 ## Run the demo
 
 ```bash
+cd demo
 pnpm install   # or npm install
 pnpm dev       # then open the printed localhost URL
 ```
 
-The demo (`src/App.jsx`, `src/demo-data.js`) renders the slider with random
-artworks pulled live from [The Met Collection API](https://metmuseum.github.io/)
-— it searches for image-bearing works under a random term each load, so you get
-a different set every refresh.
+The demo (`demo/src/App.jsx`, `demo/src/demo-data.js`) renders the slider with
+random artworks pulled live from
+[The Met Collection API](https://metmuseum.github.io/) — it searches for
+image-bearing works under a random term each load, so you get a different set
+every refresh.
 
-## Use it in your project
+## Install
 
-Copy these into your app:
+```bash
+pnpm add github:olicarignan/slider-lightbox
+```
 
-- `src/components/Slider.jsx`
-- `src/components/Lightbox.jsx`
-- `src/styles/slider.css`
-- `src/styles/lightbox.css`
-- `public/images/svg/cursor_plus.svg`, `public/images/svg/cursor_x.svg`
-  (the custom zoom cursors — or edit the `cursor:` rules in the CSS to drop them)
+`react` and `react-dom` are peer dependencies; `motion` comes along as a
+dependency. The package builds itself from source on install (a `prepare`
+script runs `tsup`). pnpm (v10+) requires git deps with build scripts to be
+allowlisted, so add this to your `package.json`:
 
-Install peer dependencies: `react`, `react-dom`, `motion`, `torph`.
+```json
+"pnpm": { "onlyBuiltDependencies": ["slider-lightbox"] }
+```
 
-Import the styles once, then render:
+Import the component and its stylesheet once, then render with your items:
 
 ```jsx
-import { Slider } from "./components/Slider";
-import "./styles/slider.css";
-import "./styles/lightbox.css";
+import { Slider } from "slider-lightbox";
+import "slider-lightbox/styles.css";
 
 <Slider items={items} />;
 ```
 
+The stylesheet is self-contained — the custom zoom cursors are inlined as data
+URIs, so there are no asset files to host.
+
+### Optional: animated caption
+
+The meta caption renders as plain `<h3>` / `<p>` by default. To animate it
+(letter morphing, as in the demo), pass any component that accepts an `as` tag
+and `children` to the `Caption` prop. The demo uses `metamorphosis`:
+
+```bash
+pnpm add github:olicarignan/metamorphosis
+```
+
+It's also a self-building git dependency, so allowlist it too:
+
+```json
+"pnpm": { "onlyBuiltDependencies": ["slider-lightbox", "metamorphosis"] }
+```
+
+Then pass it in:
+
+```jsx
+import { TextMorph } from "metamorphosis/react";
+
+<Slider items={items} Caption={TextMorph} />;
+```
+
+Any component with the same `({ as, children })` contract works — bring your
+own.
+
 ### Required CSS tokens
 
 The stylesheets read a few CSS custom properties — define them on `:root` (see
-`src/demo.css`):
+`demo/src/demo.css`):
 
 | Token             | Used for                                    |
 | ----------------- | ------------------------------------------- |
@@ -83,6 +130,7 @@ To get the rest of the page to cross-fade during the zoom, also set
 | `maxItemHeight`     | `number` | `520`                              | Max height (px) of a panel; taller images scale down keeping ratio.|
 | `sizes`             | `string` | `(min-width: 700px) 628px, 82vw`   | `sizes` hint for the panel `<img>`.                                |
 | `lightboxSizes`     | `string` | `84vw`                             | `sizes` hint forwarded to the lightbox images.                     |
+| `Caption`           | `Component` | plain `<h3>`/`<p>`              | Component used to render the meta title/subtitle. Receives `as` and `children`. Pass `text-morph`'s `TextMorph` (or your own) to animate. |
 
 ## `<Lightbox>` props (internal)
 
@@ -128,6 +176,6 @@ placeholder/swap layer is rendered.
 ## Notes
 
 - Don't wrap the app in `<StrictMode>` — its dev-only double-invoke of effects
-  fights the one-pass measure / view-transition logic. See `src/main.jsx`.
+  fights the one-pass measure / view-transition logic. See `demo/src/main.jsx`.
 - The view transition uses a single shared name (`slider-active`), so render one
   `<Slider>` per page if you rely on the zoom animation.

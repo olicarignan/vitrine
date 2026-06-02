@@ -1,3 +1,12 @@
+:root {
+  /* Custom zoom cursor, inlined as a data URI so the stylesheet is
+     self-contained (no hosted SVG assets required). */
+  --slider-cursor-zoom-in:
+    url("data:image/svg+xml,%3Csvg%20width%3D%2217%22%20height%3D%2217%22%20viewBox%3D%220%200%2017%2017%22%20fill%3D%22none%22%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%3E%0A%3Cpath%20d%3D%22M9.19643%207.80357H15V9.19643H9.19643V15H7.80357V9.19643H2V7.80357H7.80357V2H9.19643V7.80357Z%22%20fill%3D%22black%22%20stroke%3D%22white%22%20stroke-width%3D%220.3%22%20stroke-linejoin%3D%22round%22%2F%3E%0A%3C%2Fsvg%3E")
+      8 8,
+    zoom-in;
+}
+
 .slider {
   width: 100vw;
   margin-top: 3lh;
@@ -94,9 +103,7 @@
     video {
       display: block;
       border-radius: 16px;
-      cursor:
-        url("/images/svg/cursor_plus.svg") 8 8,
-        zoom-in;
+      cursor: var(--slider-cursor-zoom-in);
       /* Keep each image's native aspect ratio, bounded by the max width/height. */
       width: auto;
       height: auto;

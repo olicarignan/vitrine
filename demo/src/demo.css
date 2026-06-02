@@ -1,0 +1,294 @@
+@font-face {
+  font-family: "Monument Grotesk";
+  src: url("/fonts/MonumentGrotesk/ABCMonumentGroteskVariable.woff2")
+    format("woff2");
+  font-weight: 100 900;
+  font-style: normal;
+  font-display: swap;
+}
+
+:root {
+  /* Tokens the components read (gap kept at 32px under the 62.5% root). */
+  --gap: 0.8rem;
+
+  /* Colours — from oliviercarignan */
+  --background-color: #fff;
+  --color-black: #131718;
+  --color-grey: #63635e;
+  --accent-color: var(--color-black);
+  --text-color: var(--color-grey);
+  --border-color: #bfbfbf;
+  --color-text: var(
+    --color-black
+  ); /* alias used by the lightbox close button */
+
+  /* Page theme */
+  --bg: #f4f3f0;
+
+  --font-sans: "Monument Grotesk", Helvetica, sans-serif;
+
+  color-scheme: light;
+
+  /* Lets the rest of the page cross-fade during the lightbox view transition */
+  view-transition-name: root;
+
+  @media (min-width: 700px) {
+    --gap: 3.2rem;
+  }
+}
+
+* {
+  box-sizing: border-box;
+}
+
+/* 1rem = 10px, so rem values read as pixels — from oliviercarignan */
+html {
+  font-size: 62.5%;
+}
+
+html,
+body {
+  margin: 0;
+  padding: 0;
+  font-family: var(--font-sans);
+  font-weight: 375;
+  line-height: 1.44;
+  color: var(--color-grey);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  text-rendering: optimizeLegibility;
+}
+
+body {
+  background: var(--bg);
+  overflow-x: hidden;
+  font-size: 1.75rem;
+  line-height: 1.44;
+  letter-spacing: -0.01em;
+}
+
+:focus:not(:focus-visible) {
+  outline: none;
+}
+
+/* Typography — from oliviercarignan */
+h1,
+h2,
+h3,
+h4,
+h5 {
+  margin: 0;
+  line-height: 1.44;
+  font-weight: 425;
+  font-size: 1.75rem;
+  letter-spacing: -0.0175em;
+  color: var(--color-black);
+}
+
+h2,
+h3,
+h4,
+h5 {
+  margin-bottom: 0.5em;
+}
+
+p {
+  margin: 0;
+}
+
+a {
+  color: inherit;
+  line-height: 1.2;
+  position: relative;
+  display: inline;
+  text-decoration: none;
+  transition: all 0.3s ease-in-out;
+}
+
+p a {
+  text-decoration: underline;
+  color: var(--color-black);
+}
+
+ul {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+
+  li {
+    margin: 0;
+    padding: 0;
+  }
+}
+
+/* Demo page chrome */
+.page {
+  min-height: 100dvh;
+  padding: clamp(3.2rem, 6vw, 9.6rem) 0 6.4rem;
+}
+
+/* Header and status sit in the grid's content column (span the whole subgrid). */
+.page__header {
+  grid-column: 1 / -1;
+}
+
+.page__header p {
+  color: var(--text-color);
+}
+
+/* Visually hidden, but still announced by screen readers. */
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+/* Loading skeleton — mirrors the <Slider> footprint. It lives in the same grid
+   as the header, so the active panel and caption align to the content column's
+   left edge; the next panel peeks to the right and is clipped by the body's
+   horizontal overflow. Keeps the layout from shifting when the slider mounts. */
+.slider-skeleton {
+  grid-column: 1 / -1;
+  margin-top: 3lh;
+  margin-bottom: 4.75lh;
+
+  @media (min-width: 700px) {
+    margin-top: 4lh;
+    margin-bottom: 6.75lh;
+  }
+}
+
+.slider-skeleton__track {
+  position: relative;
+  display: flex;
+  align-items: flex-end;
+  /* Match the slider's panel gap (1.6rem mobile, 3.2rem desktop). */
+  gap: 1.6rem;
+
+  @media (min-width: 700px) {
+    gap: 3.2rem;
+  }
+}
+
+.slider-skeleton__panel {
+  /* Each panel fills the content column; the side one overflows to the right
+     past the column edge and is clipped by the page (body overflow-x: hidden). */
+  flex: 0 0 100%;
+  border-radius: 16px;
+  height: clamp(320px, 42vw, 460px);
+
+  @media (max-width: 699px) {
+    border-radius: 12px;
+    height: 60vw;
+  }
+}
+
+/* The peeking neighbour sits a touch shorter and dimmer to suggest depth. */
+.slider-skeleton__panel--side {
+  height: clamp(300px, 40vw, 432px);
+  opacity: 0.55;
+}
+
+.slider-skeleton__meta {
+  margin-top: 0.75lh;
+}
+
+.slider-skeleton__line {
+  display: block;
+  height: 1.4rem;
+  border-radius: 4px;
+}
+
+.slider-skeleton__line--title {
+  width: 42%;
+}
+
+.slider-skeleton__line--sub {
+  width: 26%;
+  margin-top: 0.6rem;
+  opacity: 0.7;
+}
+
+/* Shimmer sweep. */
+.slider-skeleton__panel,
+.slider-skeleton__line {
+  --skeleton-base: color-mix(in srgb, var(--color-black) 9%, var(--bg));
+  background-color: var(--skeleton-base);
+  background-image: linear-gradient(
+    100deg,
+    transparent 30%,
+    rgba(255, 255, 255, 0.55) 50%,
+    transparent 70%
+  );
+  background-size: 200% 100%;
+  background-repeat: no-repeat;
+  animation: slider-skeleton-shimmer 1.4s ease-in-out infinite;
+}
+
+@keyframes slider-skeleton-shimmer {
+  from {
+    background-position: 150% 0;
+  }
+  to {
+    background-position: -150% 0;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .slider-skeleton__panel,
+  .slider-skeleton__line {
+    animation: none;
+    background-image: none;
+  }
+}
+
+/* Install instructions below the slider. */
+.page__install {
+  grid-column: 1 / -1;
+  color: var(--text-color);
+
+  h2 {
+    color: var(--color-black);
+  }
+
+  p {
+    margin-top: 1lh;
+  }
+
+  code {
+    font-family: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+    font-size: 0.85em;
+    color: var(--color-black);
+  }
+}
+
+.page__install-files {
+  margin-top: 0.5lh;
+  list-style: none;
+  padding: 0;
+
+  li {
+    margin-top: 0.25lh;
+  }
+}
+
+.page__install pre {
+  margin-top: 0.5lh;
+  padding: 1.6rem 2rem;
+  border: 1px solid var(--border-color);
+  border-radius: 12px;
+  background: color-mix(in srgb, var(--color-black) 4%, transparent);
+  overflow-x: auto;
+
+  code {
+    font-size: 1.4rem;
+    line-height: 1.6;
+    white-space: pre;
+  }
+}

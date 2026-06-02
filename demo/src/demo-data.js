@@ -5,12 +5,18 @@
 // `hasImages=true` and a random query term to get a pool of object IDs that have
 // images, shuffle it, then fetch a few object records and map them into the flat
 // item shape the slider expects. A fresh random term each load keeps the set
-// varied between refreshes.
+// varied between refreshes. An optional aspect-ratio filter (see
+// `fetchRandomProjects` opts) measures each candidate image and keeps only the
+// ones whose ratio fits — the Met record has no image dimensions, so we probe
+// the actual image.
 //
 // In a real project you'd map your own CMS / image pipeline into this same flat
 // shape — see the item-shape docs in Slider.jsx.
 
 const BASE = "https://collectionapi.metmuseum.org/public/collection/v1";
+
+// Skip works with unwieldy titles so the meta line stays tidy in the slider.
+const MAX_TITLE_LENGTH = 30;
 
 // Broad terms that each return thousands of image-bearing works, so any pick
 // yields plenty of candidates. The chosen term loosely themes a given load.
@@ -66,6 +72,19 @@ const FALLBACK_ITEMS = [
   },
 ];
 
+// Probe an image's natural pixel size by loading it. The Met object record has
+// no image dimensions (only physical artwork `measurements`), so this is the
+// only reliable way to filter by aspect ratio. Resolves null on error.
+function probeImage(src) {
+  return new Promise((resolve) => {
+    if (!src) return resolve(null);
+    const img = new Image();
+    img.onload = () => resolve({ width: img.naturalWidth, height: img.naturalHeight });
+    img.onerror = () => resolve(null);
+    img.src = src;
+  });
+}
+
 function shuffle(arr) {
   for (let i = arr.length - 1; i > 0; i--) {
     const j = Math.floor(Math.random() * (i + 1));
@@ -111,8 +130,20 @@ function toItem(o) {
 /**
  * Fetch `count` random Met artworks (each with an image) for the slider.
  * Falls back to a small built-in set if the network is unavailable.
+ *
+ * @param {number} count                   How many items to return.
+ * @param {object} [opts]
+ * @param {number} [opts.minAspect]         Min width/height ratio to accept
+ *                                          (e.g. 0.7 drops tall portraits).
+ * @param {number} [opts.maxAspect]         Max width/height ratio to accept
+ *                                          (e.g. 1.8 drops wide panoramas).
+ *
+ * For a "preferred aspect ratio with tolerance", pass a range around it —
+ * e.g. roughly square: `{ minAspect: 0.85, maxAspect: 1.15 }`.
  */
-export async function fetchRandomProjects(count = 6) {
+export async function fetchRandomProjects(count = 6, opts = {}) {
+  const { minAspect, maxAspect } = opts;
+  const hasConstraints = minAspect != null || maxAspect != null;
   try {
     const ids = shuffle(await searchObjectIDs());
     const items = [];
@@ -120,14 +151,41 @@ export async function fetchRandomProjects(count = 6) {
     // Fetch object records in parallel batches and keep the ones that resolved
     // to a usable image. `hasImages=true` means a single batch is normally
     // enough; we walk further into the shuffled pool only if some came up short.
+    // With aspect constraints we pull a wider batch since many get rejected.
     let cursor = 0;
     while (items.length < count && cursor < ids.length) {
-      const batch = ids.slice(cursor, cursor + count * 2);
+      const batchSize = hasConstraints ? count * 4 : count * 2;
+      const batch = ids.slice(cursor, cursor + batchSize);
       cursor += batch.length;
-      const objects = await Promise.all(batch.map(fetchObject));
-      for (const o of objects) {
+      const objects = (await Promise.all(batch.map(fetchObject))).filter(
+        (o) =>
+          o &&
+          o.primaryImageSmall &&
+          (!o.title || o.title.length <= MAX_TITLE_LENGTH),
+      );
+
+      if (!hasConstraints) {
+        for (const o of objects) {
+          if (items.length >= count) break;
+          items.push(toItem(o));
+        }
+        continue;
+      }
+
+      // Measure each candidate image (in parallel) and keep those whose aspect
+      // ratio falls inside the requested range.
+      const measured = await Promise.all(
+        objects.map(async (o) => {
+          const dims = await probeImage(o.primaryImageSmall);
+          return dims && dims.height ? { o, aspect: dims.width / dims.height } : null;
+        }),
+      );
+      for (const m of measured) {
         if (items.length >= count) break;
-        if (o && o.primaryImageSmall) items.push(toItem(o));
+        if (!m) continue;
+        if (minAspect != null && m.aspect < minAspect) continue;
+        if (maxAspect != null && m.aspect > maxAspect) continue;
+        items.push(toItem(m.o));
       }
     }
 
