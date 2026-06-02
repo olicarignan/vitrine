@@ -149,9 +149,13 @@ body {
   text-rendering: optimizeLegibility;
 }
 
+html,
+body {
+  overflow-x: hidden;
+}
+
 body {
   background: var(--bg);
-  overflow-x: hidden;
   font-size: 1.75rem;
   line-height: 1.32;
   letter-spacing: -0.01em;
