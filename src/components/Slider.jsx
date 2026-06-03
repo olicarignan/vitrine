@@ -286,9 +286,6 @@ export function Slider({
     const track = trackRef.current;
     if (!track) return;
 
-    // Skip detection when scroll was triggered by lightbox sync
-    if (externalScroll.current) return;
-
     if (layout.isMobile) {
       if (scrollRafTicking.current) return;
       scrollRafTicking.current = true;
@@ -297,11 +294,17 @@ export function Slider({
         const t = trackRef.current;
         if (!t) return;
         const closest = updateMobileScales(t);
-        setActiveIndex(closest);
-        clearTimeout(scrollTimer.current);
+        // Skip index update during lightbox-driven scrolls — scales still follow
+        if (!externalScroll.current) {
+          setActiveIndex(closest);
+          clearTimeout(scrollTimer.current);
+        }
       });
       return;
     }
+
+    // Desktop: skip detection when scroll was triggered by lightbox sync
+    if (externalScroll.current) return;
 
     // Desktop: activate the project as soon as it overlaps the active slot by >50%
     if (scrollRafTicking.current) return;
