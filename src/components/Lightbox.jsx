@@ -624,6 +624,7 @@ function LightboxItem({ item, index, activeIndex, sizes, staggerDone, onClick })
   return (
     <div
       className={`lightbox__item${isActive ? " lightbox__item--active" : ""}`}
+      data-index={index}
       // Stagger delay is only for the initial reveal; once that's done we drop it
       // so navigation dims the outgoing item and brightens the incoming one on
       // identical timing.

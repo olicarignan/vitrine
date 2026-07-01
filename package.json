@@ -38,8 +38,13 @@
     "react-dom": ">=18"
   },
   "dependencies": {
-    "metamorphosis": "github:olicarignan/metamorphosis",
+    "metamorphosis": "github:olicarignan/metamorphosis#e0419aa029beb0dcfd7c64e979997e02d084ae8f",
     "motion": "^12.19.1"
+  },
+  "pnpm": {
+    "onlyBuiltDependencies": [
+      "metamorphosis"
+    ]
   },
   "devDependencies": {
     "tsup": "^8.5.0",

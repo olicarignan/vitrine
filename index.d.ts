@@ -57,6 +57,14 @@ export interface SliderProps {
    * `PlainCaption` (or your own) to opt out of the animation.
    */
   Caption?: ComponentType<CaptionProps>;
+  /**
+   * Replace the static SVG cursors with a morphing icon cursor that follows the
+   * pointer (metamorphosis `IconMorph`): `+` over a slider panel, `×` over the
+   * active lightbox item or overlay, and `←`/`→` over the previous/next items.
+   * Precise-pointer only; touch and no-JS keep the static cursors. Default
+   * `false`.
+   */
+  morphCursor?: boolean;
 }
 
 export declare const Slider: ComponentType<SliderProps>;

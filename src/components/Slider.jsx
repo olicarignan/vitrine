@@ -5,6 +5,7 @@ import { flushSync } from "react-dom";
 import { motion, AnimatePresence } from "motion/react";
 import { TextMorph } from "metamorphosis/react";
 import { Lightbox } from "./Lightbox";
+import { MorphCursor } from "./MorphCursor";
 
 // Plain caption renderer: a bare element with no animation. Pass it (or any
 // component taking `as` + `children`) as the `Caption` prop to opt out of the
@@ -78,6 +79,7 @@ export function Slider({
   lightboxSizes = "84vw",
   Caption = TextMorph,
   lightboxControls = false,
+  morphCursor = false,
 }) {
   const trackRef = useRef(null);
   const rootRef = useRef(null);
@@ -651,7 +653,7 @@ export function Slider({
 
   return (
     <motion.div
-      className="slider"
+      className={`slider${morphCursor ? " slider--morph-cursor" : ""}`}
       ref={rootRef}
       variants={staggerItems}
       onPointerEnter={() => (hoveredRef.current = true)}
@@ -685,7 +687,9 @@ export function Slider({
               style={{
                 "--item-max-w": `${layout.itemWidth}px`,
                 "--item-max-h": `${maxItemHeight}px`,
-                cursor: "zoom-in",
+                // Inline style beats CSS specificity, so drop it when the morph
+                // cursor is on (it hides the native cursor via CSS instead).
+                cursor: morphCursor ? "none" : "zoom-in",
               }}
               onClick={() => {
                 // Touch clicks (pointer capture doesn't apply to touch)
@@ -770,6 +774,7 @@ export function Slider({
           />
         )}
       </AnimatePresence>
+      {morphCursor && <MorphCursor lightboxOpen={lightboxOpen} />}
     </motion.div>
   );
 }

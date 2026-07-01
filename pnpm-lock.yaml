@@ -9,8 +9,8 @@ importers:
   .:
     dependencies:
       metamorphosis:
-        specifier: github:olicarignan/metamorphosis
-        version: https://codeload.github.com/olicarignan/metamorphosis/tar.gz/bd28b657dd1ab1af980c1e220c6fcf6f7835b1ac(react-dom@19.2.6(react@19.2.6))(react@19.2.6)
+        specifier: github:olicarignan/metamorphosis#e0419aa029beb0dcfd7c64e979997e02d084ae8f
+        version: https://codeload.github.com/olicarignan/metamorphosis/tar.gz/e0419aa029beb0dcfd7c64e979997e02d084ae8f(react-dom@19.2.6(react@19.2.6))(react@19.2.6)
       motion:
         specifier: ^12.19.1
         version: 12.40.0(react-dom@19.2.6(react@19.2.6))(react@19.2.6)
@@ -436,8 +436,8 @@ packages:
   magic-string@0.30.21:
     resolution: {integrity: sha512-vd2F4YUyEXKGcLHoq+TEyCjxueSeHnFxyyjNp80yg0XV4vUhnDer/lvvlqM/arB5bXQN5K2/3oinyCRyx8T2CQ==}
 
-  metamorphosis@https://codeload.github.com/olicarignan/metamorphosis/tar.gz/bd28b657dd1ab1af980c1e220c6fcf6f7835b1ac:
-    resolution: {tarball: https://codeload.github.com/olicarignan/metamorphosis/tar.gz/bd28b657dd1ab1af980c1e220c6fcf6f7835b1ac}
+  metamorphosis@https://codeload.github.com/olicarignan/metamorphosis/tar.gz/e0419aa029beb0dcfd7c64e979997e02d084ae8f:
+    resolution: {tarball: https://codeload.github.com/olicarignan/metamorphosis/tar.gz/e0419aa029beb0dcfd7c64e979997e02d084ae8f}
     version: 0.0.9
     peerDependencies:
       react: '>=18'
@@ -873,7 +873,7 @@ snapshots:
     dependencies:
       '@jridgewell/sourcemap-codec': 1.5.5
 
-  metamorphosis@https://codeload.github.com/olicarignan/metamorphosis/tar.gz/bd28b657dd1ab1af980c1e220c6fcf6f7835b1ac(react-dom@19.2.6(react@19.2.6))(react@19.2.6):
+  metamorphosis@https://codeload.github.com/olicarignan/metamorphosis/tar.gz/e0419aa029beb0dcfd7c64e979997e02d084ae8f(react-dom@19.2.6(react@19.2.6))(react@19.2.6):
     optionalDependencies:
       react: 19.2.6
       react-dom: 19.2.6(react@19.2.6)

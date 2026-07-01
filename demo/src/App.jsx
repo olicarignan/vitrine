@@ -62,7 +62,7 @@ export default function App() {
           </header>
         </div>
       </div>
-      {projects ? <Slider items={projects} /> : <SliderSkeleton />}
+      {projects ? <Slider items={projects} morphCursor /> : <SliderSkeleton />}
       {/* Video slider temporarily disabled. Re-enable by uncommenting the
           videos state + fetchArtVideos effect above and this block. Hidden when
           the Pexels fetch returns empty; shows a skeleton while it loads.
@@ -93,7 +93,11 @@ export default function App() {
               <pre>
                 <code>{USAGE}</code>
               </pre>
-              <CopyButton className="usage__copy" text={USAGE} label="Copy usage snippet" />
+              <CopyButton
+                className="usage__copy"
+                text={USAGE}
+                label="Copy usage snippet"
+              />
             </div>
             <p className="install__link">
               For documentation, check the project on{" "}
