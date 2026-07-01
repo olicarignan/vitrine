@@ -48,6 +48,7 @@ const itemFadeIn = {
  * @param {string}   [props.sizes]            `sizes` hint for the panel <img>.
  * @param {string}   [props.lightboxSizes]    `sizes` hint forwarded to the lightbox images.
  * @param {React.ElementType} [props.Caption]  Caption renderer (takes `as` + `children`). Defaults to metamorphosis's morphing `<TextMorph>`; pass `PlainCaption` (or your own) to opt out.
+ * @param {boolean}  [props.lightboxControls=false] Show prev/close/next buttons in the lightbox (on all breakpoints). Off by default — the caption carries the context and swipe/keys navigate.
  *
  * Item shape (all image fields are plain strings — bring your own CMS/transform):
  * {
@@ -76,6 +77,7 @@ export function Slider({
   sizes = "(min-width: 700px) 628px, 82vw",
   lightboxSizes = "84vw",
   Caption = TextMorph,
+  lightboxControls = false,
 }) {
   const trackRef = useRef(null);
   const rootRef = useRef(null);
@@ -283,7 +285,11 @@ export function Slider({
       return;
     }
 
-    // Desktop: activate the project as soon as it overlaps the active slot by >50%
+    // Desktop: panels snap start-aligned to the slot's left edge, so the active
+    // panel is the one whose left edge is nearest that edge. (Overlap-based
+    // detection favoured a wide neighbour over a narrow start-aligned panel, so a
+    // narrow portrait would read as inactive and clicking it opened the next
+    // slide.) This matches the left-edge snap used by the drag inertia.
     if (scrollRafTicking.current) return;
     scrollRafTicking.current = true;
     requestAnimationFrame(() => {
@@ -293,34 +299,20 @@ export function Slider({
 
       const itemEls = t.querySelectorAll(".slider__item");
       const slotLeft = layout.inset;
-      const slotRight = layout.inset + layout.itemWidth;
 
-      let bestIndex = -1;
-      let bestOverlap = 0;
-      let bestWidth = layout.itemWidth;
+      let bestIndex = 0;
+      let bestDist = Infinity;
       itemEls.forEach((item, i) => {
-        const rect = item.getBoundingClientRect();
-        const overlap = Math.max(
-          0,
-          Math.min(rect.right, slotRight) - Math.max(rect.left, slotLeft),
-        );
-        if (overlap > bestOverlap) {
-          bestOverlap = overlap;
+        const dist = Math.abs(item.getBoundingClientRect().left - slotLeft);
+        if (dist < bestDist) {
+          bestDist = dist;
           bestIndex = i;
-          bestWidth = rect.width;
         }
       });
 
-      // Activate once the panel fills more than half the active slot. Narrow
-      // (portrait) panels are measured against their own width so they still trip.
-      if (
-        bestIndex >= 0 &&
-        bestOverlap / Math.min(bestWidth, layout.itemWidth) > 0.5
-      ) {
-        setActiveIndex(bestIndex);
-      }
+      setActiveIndex(bestIndex);
     });
-  }, [layout.inset, layout.itemWidth, layout.isMobile, updateMobileScales]);
+  }, [layout.inset, layout.isMobile, updateMobileScales]);
 
   useEffect(() => {
     const track = trackRef.current;
@@ -544,7 +536,12 @@ export function Slider({
     return () => cleanups.forEach((fn) => fn());
   }, [activeIndex, sliderVideosHidden]);
 
-  const closeLightbox = useCallback(() => {
+  const closeLightbox = useCallback(
+    (opts) => {
+    // A drag-dismiss has already displaced/scaled the image and faded the
+    // backdrop, so we skip the neighbor/backdrop fade and run the shared-element
+    // transition immediately — from wherever the finger released.
+    const fromDrag = opts?.fromDrag === true;
     if (activeTransition.current) return;
     const sliderItems = trackRef.current?.querySelectorAll(".slider__item");
     if (!sliderItems?.[activeIndex]) {
@@ -554,10 +551,32 @@ export function Slider({
 
     // Step 1: Fade out neighbors and backdrop
     const lightboxEl = document.querySelector(".lightbox");
-    if (lightboxEl) lightboxEl.classList.add("lightbox--closing");
+    if (lightboxEl && !fromDrag) lightboxEl.classList.add("lightbox--closing");
+
+    // Park the slider on the active item, and hold it there for the whole close.
+    // On mobile the drag-dismiss path can trigger a spurious re-measure/sync that
+    // resets the slider to the first item mid-transition; a scroll listener snaps
+    // it right back (guarded against sub-pixel loops) so there's no visible
+    // bounce. Both the morph target and the final resting position stay correct.
+    const parkInline = layout.isMobile ? "center" : "start";
+    const sliderTrack = trackRef.current;
+    const parkActive = () => {
+      const el = sliderItems[activeIndex];
+      if (!el) return;
+      const rect = el.getBoundingClientRect();
+      const target = parkInline === "center" ? window.innerWidth / 2 : layout.inset;
+      const pos = parkInline === "center" ? rect.left + rect.width / 2 : rect.left;
+      if (Math.abs(pos - target) < 4) return; // already in place — avoid a loop
+      el.scrollIntoView({ behavior: "instant", block: "nearest", inline: parkInline });
+    };
+    sliderTrack?.addEventListener("scroll", parkActive);
+    const endHold = () => sliderTrack?.removeEventListener("scroll", parkActive);
 
     const runViewTransition = () => {
-      if (activeTransition.current) return;
+      if (activeTransition.current) {
+        endHold();
+        return;
+      }
       if (document.startViewTransition) {
         // Restore slider videos before snapshot so they appear in the capture
         sliderItems.forEach((item) => {
@@ -577,6 +596,9 @@ export function Slider({
           const lightboxRoot = document.querySelector(".lightbox");
           if (lightboxRoot) lightboxRoot.style.display = "none";
 
+          // Position the slider on the active item before the new snapshot.
+          parkActive();
+
           // New snapshot: slider item gets the name
           sliderItems[activeIndex].style.viewTransitionName = "slider-active";
           flushSync(() => setLightboxOpen(false));
@@ -587,19 +609,29 @@ export function Slider({
           activeTransition.current = null;
           sliderItems[activeIndex].style.viewTransitionName = "";
           document.documentElement.style.viewTransitionName = "";
+          endHold();
         });
       } else {
+        // No View Transitions: still park, and release the hold shortly after.
+        parkActive();
         setLightboxOpen(false);
+        setTimeout(endHold, 400);
       }
     };
 
-    // Step 2: Wait for fade-out to finish, then run view transition
-    if (lightboxEl) {
+    // Step 2: Run the transition — after the neighbor/backdrop fade normally, or
+    // on the next frame for a drag dismiss so the touch gesture settles and the
+    // slider parks correctly before the snapshot.
+    if (fromDrag) {
+      requestAnimationFrame(runViewTransition);
+    } else if (lightboxEl) {
       setTimeout(runViewTransition, 350);
     } else {
       runViewTransition();
     }
-  }, [activeIndex]);
+    },
+    [activeIndex, layout.isMobile],
+  );
 
   const handleLightboxActiveChange = useCallback(
     (index) => {
@@ -731,6 +763,8 @@ export function Slider({
             items={items}
             activeIndex={activeIndex}
             sizes={lightboxSizes}
+            Caption={Caption}
+            controls={lightboxControls}
             onActiveIndexChange={handleLightboxActiveChange}
             onClose={closeLightbox}
           />

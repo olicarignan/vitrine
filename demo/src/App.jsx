@@ -6,6 +6,8 @@ import { IconLink } from "./IconLink";
 import { Slider } from "../../src/index.jsx";
 import { SliderSkeleton } from "./SliderSkeleton.jsx";
 import { fetchRandomProjects } from "./demo-data.js";
+// Video demo temporarily disabled — setup kept in ./video-data.js.
+// import { fetchArtVideos } from "./video-data.js";
 
 // Install command per package manager — the morph target for the install tabs.
 const INSTALL = [
@@ -17,14 +19,21 @@ const INSTALL = [
 
 export default function App() {
   const [projects, setProjects] = useState(null);
+  // const [videos, setVideos] = useState(null);
 
   useEffect(() => {
     let cancelled = false;
     // Constrain to roughly landscape-to-square artworks; drop tall portraits and
     // wide panoramas. Omit the opts to accept any aspect ratio.
-    fetchRandomProjects(6, { minAspect: 0.7, maxAspect: 1.8 }).then((items) => {
-      if (!cancelled) setProjects(items);
-    });
+    fetchRandomProjects(12, { minAspect: 0.7, maxAspect: 1.8 }).then(
+      (items) => {
+        if (!cancelled) setProjects(items);
+      },
+    );
+    // Video slider (disabled) — fed separately from the Pexels Video API.
+    // fetchArtVideos(6).then((items) => {
+    //   if (!cancelled) setVideos(items);
+    // });
     return () => {
       cancelled = true;
     };
@@ -35,14 +44,42 @@ export default function App() {
       <div className="grid">
         <div className="subgrid">
           <header className="page__header">
-            <h1>Gallery</h1>
+            <h1>Vitrine</h1>
+            <p>Opinionated gallery slider with lightbox and video support.</p>
             <p>
-              Drag, scroll or arrow keys to navigate. Click to open lightbox.
+              Images from the{" "}
+              <a
+                href="https://www.artic.edu/"
+                target="_blank"
+                rel="noopener noreferrer"
+              >
+                Art Institue of Chicago
+              </a>
             </p>
           </header>
         </div>
       </div>
       {projects ? <Slider items={projects} /> : <SliderSkeleton />}
+      {/* Video slider temporarily disabled. Re-enable by uncommenting the
+          videos state + fetchArtVideos effect above and this block. Hidden when
+          the Pexels fetch returns empty; shows a skeleton while it loads.
+      {(videos === null || videos.length > 0) && (
+        <>
+          <div className="grid">
+            <div className="subgrid">
+              <header className="page__header">
+                <h1>Video</h1>
+                <p>
+                  The same slider driving looping video panels, sourced from
+                  the Pexels Video API.
+                </p>
+              </header>
+            </div>
+          </div>
+          {videos ? <Slider items={videos} /> : <SliderSkeleton />}
+        </>
+      )}
+      */}
       <div className="grid">
         <div className="subgrid">
           <section className="page__install">

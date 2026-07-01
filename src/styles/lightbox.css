@@ -14,9 +14,20 @@
   display: flex;
   align-items: center;
 
+  /* Reserved bands at the bottom: one for the centered title/meta caption, and
+     (only when the optional controls are enabled via .lightbox--controls) one
+     below it for the prev/close/next buttons. The image area is pushed up by
+     their sum (padding-bottom) and its max-height shrinks by it, so a full-height
+     image never runs into either. */
+  --lb-caption-space: 8rem;
+  --lb-controls-space: 0rem;
+  padding-bottom: calc(var(--lb-caption-space) + var(--lb-controls-space));
+
   /* Each image keeps its native aspect ratio, scaled to fit within these bounds. */
   --lb-max-width: 95vw;
-  --lb-max-height: calc(100dvh - 96px);
+  --lb-max-height: calc(
+    100dvh - 96px - var(--lb-caption-space) - var(--lb-controls-space)
+  );
 
   /* Mobile: the active panel spans the full available width — i.e. the viewport
      minus the gap and a peek of the neighbouring item on each side. These match
@@ -27,8 +38,16 @@
   --lb-item-width: calc(100vw - 2 * (var(--lb-gap) + var(--lb-peek)));
 
   @media (min-width: 700px) {
+    --lb-caption-space: 9.6rem;
     --lb-max-width: calc(100vw - 80px);
-    --lb-max-height: calc(100dvh - 40px);
+    --lb-max-height: calc(
+      100dvh - 40px - var(--lb-caption-space) - var(--lb-controls-space)
+    );
+  }
+
+  /* Opt-in controls: reserve a band beneath the caption for the buttons. */
+  &.lightbox--controls {
+    --lb-controls-space: 6.4rem;
   }
 
   .lightbox__backdrop {
@@ -170,20 +189,47 @@
     opacity: 0;
   }
 
-  .lightbox__controls {
-    display: none;
+  .lightbox__meta {
+    position: fixed;
+    left: 0;
+    right: 0;
+    /* Sits directly above the controls band (0 when controls are off). */
+    bottom: var(--lb-controls-space);
+    height: var(--lb-caption-space);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 0.2rem;
+    padding: 0 2.4rem;
+    text-align: center;
+    /* Let clicks fall through to the backdrop (which closes the lightbox). */
+    pointer-events: none;
+    opacity: 0;
+    transition: opacity 1s cubic-bezier(0, 0.55, 0.45, 1);
 
-    @media (max-width: 699px) {
-      display: flex;
-      gap: 0.8rem;
-      position: fixed;
-      bottom: 3.2rem;
-      left: 50%;
-      transform: translateX(-50%);
-      z-index: 10;
-      opacity: 0;
-      transition: opacity 1s cubic-bezier(0, 0.55, 0.45, 1);
+    h2 {
+      margin: 0;
+      color: var(--accent-color);
     }
+    p {
+      margin: 0;
+      color: var(--text-color);
+    }
+  }
+
+  /* Only rendered when the `controls` prop is set, so shown on all breakpoints.
+     Pinned to the bottom controls band, clear of the caption above it. */
+  .lightbox__controls {
+    display: flex;
+    gap: 0.8rem;
+    position: fixed;
+    bottom: 1.6rem;
+    left: 50%;
+    transform: translateX(-50%);
+    z-index: 10;
+    opacity: 0;
+    transition: opacity 1s cubic-bezier(0, 0.55, 0.45, 1);
   }
 
   .lightbox__close,
@@ -223,7 +269,8 @@
     transform: scale(1);
   }
 
-  &.lightbox--revealed .lightbox__controls {
+  &.lightbox--revealed .lightbox__controls,
+  &.lightbox--revealed .lightbox__meta {
     opacity: 1;
   }
 
@@ -243,7 +290,8 @@
       transform 0.3s cubic-bezier(0, 0.55, 0.45, 1);
   }
 
-  &.lightbox--closing .lightbox__controls {
+  &.lightbox--closing .lightbox__controls,
+  &.lightbox--closing .lightbox__meta {
     opacity: 0;
     transition: opacity 0.3s cubic-bezier(0, 0.55, 0.45, 1);
   }

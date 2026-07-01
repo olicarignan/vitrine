@@ -44,10 +44,15 @@ pnpm dev       # then open the printed localhost URL
 ```
 
 The demo (`demo/src/App.jsx`, `demo/src/demo-data.js`) renders the slider with
-random artworks pulled live from
-[The Met Collection API](https://metmuseum.github.io/) — it searches for
-image-bearing works under a random term each load, so you get a different set
-every refresh.
+random artworks pulled live from the
+[Art Institute of Chicago API](https://api.artic.edu/docs/) — it searches for
+public-domain, image-bearing works under a random term each load, so you get a
+different set every refresh. A second slider below it (`demo/src/video-data.js`)
+drives looping `<video>` panels from the
+[Pexels Video API](https://www.pexels.com/api/) — free, no-attribution MP4 stock
+clips — showing the same component handling video items. That slider needs a free
+Pexels key in `VITE_PEXELS_KEY` (copy `demo/.env.example` to `demo/.env.local`);
+without it, the video section is simply skipped.
 
 ## Install
 

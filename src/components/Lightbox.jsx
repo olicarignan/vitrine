@@ -8,6 +8,12 @@ import {
   useCallback,
 } from "react";
 import { motion } from "motion/react";
+import { TextMorph } from "metamorphosis/react";
+
+// Mobile drag-down-to-dismiss: release past this drop distance (px) or flick
+// velocity (px per ms) dismisses; otherwise the image springs back.
+const DISMISS_THRESHOLD = 110;
+const DISMISS_VELOCITY = 0.55;
 
 /**
  * Fullscreen, draggable lightbox. Rendered by <Slider> during the shared-element
@@ -17,6 +23,8 @@ import { motion } from "motion/react";
  * @param {Array}    props.items                Same item array passed to <Slider>.
  * @param {number}   props.activeIndex          Index to open on.
  * @param {string}   [props.sizes="84vw"]       `sizes` hint for the images.
+ * @param {React.ElementType} [props.Caption]   Caption renderer (takes `as` + `children`); defaults to metamorphosis's morphing `<TextMorph>`, matching the slider.
+ * @param {boolean}  [props.controls=false]     Render the prev/close/next buttons (on all breakpoints).
  * @param {Function} props.onActiveIndexChange  Called with the new index as the user scrolls.
  * @param {Function} props.onClose              Called to dismiss the lightbox.
  */
@@ -24,6 +32,8 @@ export function Lightbox({
   items,
   activeIndex: initialIndex,
   sizes = "84vw",
+  Caption = TextMorph,
+  controls = false,
   onActiveIndexChange,
   onClose,
 }) {
@@ -32,11 +42,22 @@ export function Lightbox({
   const [activeIndex, setActiveIndex] = useState(initialIndex);
   const [, setIsDragging] = useState(false);
   const dragDistRef = useRef(0);
+  // Tracks a possible touch drag-down-to-dismiss gesture (null when idle).
+  const dismissRef = useRef(null);
+  // While a dismiss drag is active we switch the track to overflow:visible so the
+  // dragged image isn't clipped; this holds the captured scrollLeft to restore.
+  const freezeRef = useRef({ frozen: false, scrollLeft: 0 });
+  const restoreTimerRef = useRef(null);
   // The index to open on, captured once at mount. The `activeIndex` prop tracks
   // the slider and changes as the user scrolls the lightbox, so we can't use it
   // to (re)position — that would fight the user's scrolling.
   const openIndexRef = useRef(initialIndex);
   const [neighborsRevealed, setNeighborsRevealed] = useState(false);
+  // The reveal staggers each neighbor's sharpen-in by distance (a per-item
+  // transition-delay). Once revealed we drop that delay, so navigating between
+  // items dims the outgoing one and brightens the incoming one in lockstep
+  // rather than delaying the outgoing item's darkening.
+  const [staggerDone, setStaggerDone] = useState(false);
   const revealedRef = useRef(false);
   const scrollRafTicking = useRef(false);
   const lastActiveRef = useRef(initialIndex);
@@ -63,7 +84,14 @@ export function Lightbox({
         });
       }
     }, 500);
-    return () => clearTimeout(timer);
+    // Reveal fires at 500ms; the staggered filter/transform transitions (0.4s +
+    // up to ~0.12s of stagger for the near neighbours) finish shortly after.
+    // Drop the per-item delay once they have, so subsequent navigation is synced.
+    const staggerTimer = setTimeout(() => setStaggerDone(true), 1100);
+    return () => {
+      clearTimeout(staggerTimer);
+      clearTimeout(timer);
+    };
   }, []);
 
   // Body scroll lock
@@ -175,9 +203,39 @@ export function Lightbox({
     return () => window.removeEventListener("keydown", handleKeyDown);
   }, [activeIndex, items.length, onClose, scrollToIndex]);
 
-  // Desktop drag handling
+  // Undo the dismiss-drag scroll freeze: re-enable the track's clip/scroll and
+  // restore the horizontal position in one synchronous block (no intermediate
+  // paint), so it lands exactly where it was.
+  const restoreTrack = useCallback(() => {
+    const track = trackRef.current;
+    const f = freezeRef.current;
+    if (!track || !f.frozen) return;
+    track.style.overflow = "";
+    track.scrollLeft = f.scrollLeft;
+    track.style.transform = "";
+    track.style.zIndex = "";
+    freezeRef.current = { frozen: false, scrollLeft: 0 };
+  }, []);
+
+  // Clear a pending restore if the component unmounts mid-spring.
+  useEffect(() => () => clearTimeout(restoreTimerRef.current), []);
+
+  // Desktop drag handling (mouse). Touch horizontal panning is native
+  // (touch-action: pan-x); a touch *down*-drag is captured here to dismiss.
   const handlePointerDown = useCallback((e) => {
-    if (e.pointerType === "touch") return;
+    if (e.pointerType === "touch") {
+      // Cancel any pending restore so a quick re-drag keeps the frozen position.
+      clearTimeout(restoreTimerRef.current);
+      dragDistRef.current = 0;
+      dismissRef.current = {
+        startX: e.clientX,
+        startY: e.clientY,
+        locked: null,
+        dy: 0,
+        startTime: Date.now(),
+      };
+      return;
+    }
     const track = trackRef.current;
     if (!track) return;
     dragDistRef.current = 0;
@@ -195,6 +253,60 @@ export function Lightbox({
   }, []);
 
   const handlePointerMove = useCallback((e) => {
+    if (e.pointerType === "touch") {
+      const d = dismissRef.current;
+      if (!d) return;
+      const dx = e.clientX - d.startX;
+      const dy = e.clientY - d.startY;
+      // Lock the axis once out of a small deadzone. Horizontal is left to native
+      // scroll; only a downward drag becomes a dismiss.
+      if (d.locked === null) {
+        if (Math.abs(dx) < 8 && Math.abs(dy) < 8) return;
+        d.locked = Math.abs(dy) > Math.abs(dx) && dy > 0 ? "v" : "h";
+      }
+      if (d.locked !== "v") return;
+      d.dy = Math.max(0, dy);
+      dragDistRef.current = d.dy; // suppress the post-drag click
+
+      const track = trackRef.current;
+      if (!track) return;
+
+      // First vertical move: drop the track's vertical clip so the dragged image
+      // isn't cropped. overflow-x:auto forces overflow-y to clip, so switch the
+      // track to overflow:visible and translate it by -scrollLeft to preserve the
+      // on-screen position. Only the active image then moves; neighbours stay put.
+      if (!freezeRef.current.frozen) {
+        freezeRef.current = { frozen: true, scrollLeft: track.scrollLeft };
+        track.style.overflow = "visible";
+        track.style.transform = `translateX(${-freezeRef.current.scrollLeft}px)`;
+        track.style.zIndex = "5";
+      }
+
+      const scale = Math.max(0.85, 1 - d.dy / 1400);
+      const fade = Math.max(0, 1 - d.dy / 300);
+      const backdrop = document.querySelector(".lightbox__backdrop");
+      const meta = document.querySelector(".lightbox__meta");
+      // Only the active image displaces (down + scale); neighbours hold position
+      // and fade out, along with the backdrop and caption.
+      track.querySelectorAll(".lightbox__item").forEach((item) => {
+        if (item.classList.contains("lightbox__item--active")) {
+          item.style.transition = "none";
+          item.style.transform = `translateY(${d.dy}px) scale(${scale})`;
+        } else {
+          item.style.transition = "none";
+          item.style.opacity = String(fade);
+        }
+      });
+      if (backdrop) {
+        backdrop.style.transition = "none";
+        backdrop.style.opacity = String(fade);
+      }
+      if (meta) {
+        meta.style.transition = "none";
+        meta.style.opacity = String(fade);
+      }
+      return;
+    }
     const ds = dragState.current;
     if (!ds.isDragging) return;
     const now = Date.now();
@@ -220,6 +332,54 @@ export function Lightbox({
 
   const handlePointerUp = useCallback(
     (e) => {
+      if (e.pointerType === "touch") {
+        const d = dismissRef.current;
+        dismissRef.current = null;
+        if (!d || d.locked !== "v") return;
+        const track = trackRef.current;
+        const activeEl = track?.querySelector(".lightbox__item--active");
+        const backdrop = document.querySelector(".lightbox__backdrop");
+        const meta = document.querySelector(".lightbox__meta");
+        const velocity = d.dy / Math.max(Date.now() - d.startTime, 1);
+
+        if (d.dy > DISMISS_THRESHOLD || velocity > DISMISS_VELOCITY) {
+          // Leave the drag transform in place so the shared-element transition
+          // starts from where the finger released (accounts for displacement).
+          onClose({ fromDrag: true });
+          return;
+        }
+
+        // Below threshold — spring the image back and fade neighbours back in.
+        const spring = "transform 0.3s cubic-bezier(0.25, 0.46, 0.45, 0.94)";
+        if (activeEl) {
+          activeEl.style.transition = spring;
+          activeEl.style.transform = "";
+        }
+        if (track) {
+          track.querySelectorAll(".lightbox__item").forEach((item) => {
+            if (!item.classList.contains("lightbox__item--active")) {
+              item.style.transition = "opacity 0.3s";
+              item.style.opacity = "";
+            }
+          });
+        }
+        if (backdrop) {
+          backdrop.style.transition = "opacity 0.3s";
+          backdrop.style.opacity = "";
+        }
+        if (meta) {
+          meta.style.transition = "opacity 0.3s";
+          meta.style.opacity = "";
+        }
+        // Restore the track's scroll/clip once the image has sprung back (kept
+        // unclipped through the spring so it isn't cropped on the way up).
+        clearTimeout(restoreTimerRef.current);
+        restoreTimerRef.current = setTimeout(() => {
+          if (activeEl) activeEl.style.transition = "";
+          restoreTrack();
+        }, 300);
+        return;
+      }
       const ds = dragState.current;
       if (!ds.isDragging) return;
       ds.isDragging = false;
@@ -339,7 +499,11 @@ export function Lightbox({
   );
 
   return (
-    <div className={`lightbox${neighborsRevealed ? " lightbox--revealed" : ""}`}>
+    <div
+      className={`lightbox${neighborsRevealed ? " lightbox--revealed" : ""}${
+        controls ? " lightbox--controls" : ""
+      }`}
+    >
       <motion.div
         className="lightbox__backdrop"
         onClick={onClose}
@@ -373,11 +537,17 @@ export function Lightbox({
             index={i}
             activeIndex={activeIndex}
             sizes={sizes}
+            staggerDone={staggerDone}
             onClick={handleItemClick}
           />
         ))}
       </div>
-      <div className="lightbox__controls">
+      <div className="lightbox__meta" aria-live="polite">
+        <Caption as="h2">{items[activeIndex]?.title}</Caption>
+        <Caption as="p">{items[activeIndex]?.meta}</Caption>
+      </div>
+      {controls && (
+        <div className="lightbox__controls">
         <button
           className="lightbox__nav"
           onClick={() => scrollToIndex(activeIndex - 1)}
@@ -438,12 +608,13 @@ export function Lightbox({
             />
           </svg>
         </button>
-      </div>
+        </div>
+      )}
     </div>
   );
 }
 
-function LightboxItem({ item, index, activeIndex, sizes, onClick }) {
+function LightboxItem({ item, index, activeIndex, sizes, staggerDone, onClick }) {
   const hasHighRes = Boolean(item.highResSrc);
   const videoUrl = item.video;
   const isActive = index === activeIndex;
@@ -453,7 +624,14 @@ function LightboxItem({ item, index, activeIndex, sizes, onClick }) {
   return (
     <div
       className={`lightbox__item${isActive ? " lightbox__item--active" : ""}`}
-      style={!isActive ? { transitionDelay: `${dist * 0.06}s` } : undefined}
+      // Stagger delay is only for the initial reveal; once that's done we drop it
+      // so navigation dims the outgoing item and brightens the incoming one on
+      // identical timing.
+      style={
+        !isActive && !staggerDone
+          ? { transitionDelay: `${dist * 0.06}s` }
+          : undefined
+      }
       onClick={() => onClick(index)}
     >
       {/* Base layer — gives the item its height and paints immediately.
