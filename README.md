@@ -1,6 +1,6 @@
 # Vitrine
 
-A draggable horizontal project slider with a shared-element zoom into a
+A draggable horizontal slider with a shared-element zoom into a
 fullscreen lightbox. Extracted as a self-contained, prop-driven component so it
 can drop into any React project — no host grid system required.
 
@@ -26,13 +26,12 @@ This repo is both the published library and a live demo:
 ## Features
 
 - Drag (with inertia + snap), wheel/trackpad scroll, and click-to-center.
-- Click the centered panel to zoom into a fullscreen, swipeable lightbox.
+- Click to zoom into a fullscreen, swipeable lightbox.
 - Shared-element view transition between the panel and the lightbox image.
 - Optional looping muted **video** per panel, autoplaying only while active.
 - Progressive hi-res image swap in the lightbox (low-res placeholder → hi-res).
 - Mobile-tuned: centered snap, depth scaling, and drag-down-to-dismiss the
-  lightbox (image follows your finger back to its panel; neighbours + backdrop
-  fade).
+  lightbox.
 - Optional prev / close / next control bar in the lightbox (`lightboxControls`),
   off by default.
 - Keyboard navigation: `←` / `→` move the slider while it's focused or hovered,
