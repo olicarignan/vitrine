@@ -30,8 +30,11 @@ This repo is both the published library and a live demo:
 - Shared-element view transition between the panel and the lightbox image.
 - Optional looping muted **video** per panel, autoplaying only while active.
 - Progressive hi-res image swap in the lightbox (low-res placeholder → hi-res).
-- Mobile-tuned: centered snap, depth scaling, and a floating prev / close / next
-  control bar.
+- Mobile-tuned: centered snap, depth scaling, and drag-down-to-dismiss the
+  lightbox (image follows your finger back to its panel; neighbours + backdrop
+  fade).
+- Optional prev / close / next control bar in the lightbox (`lightboxControls`),
+  off by default.
 - Keyboard navigation: `←` / `→` move the slider while it's focused or hovered,
   and drive the lightbox (`←` / `→` / `Esc`) while it's open.
 
@@ -106,9 +109,9 @@ The stylesheets read a few CSS custom properties — define them on `:root` (see
 | Token             | Used for                                    |
 | ----------------- | ------------------------------------------- |
 | `--gap`           | gap between slider panels (desktop)         |
-| `--accent-color`  | meta title color, focus ring, mobile control-bar background |
+| `--accent-color`  | meta title color, focus ring, control-bar background (when enabled) |
 | `--text-color`    | meta subtitle color                         |
-| `--color-text`    | mobile control-bar icon color (close + arrows) |
+| `--color-text`    | control-bar icon color — close + arrows (when enabled) |
 
 To get the rest of the page to cross-fade during the zoom, also set
 `view-transition-name: root` on `:root`.
@@ -127,6 +130,7 @@ To get the rest of the page to cross-fade during the zoom, also set
 | `sizes`             | `string` | `(min-width: 700px) 628px, 82vw`   | `sizes` hint for the panel `<img>`.                                |
 | `lightboxSizes`     | `string` | `84vw`                             | `sizes` hint forwarded to the lightbox images.                     |
 | `Caption`           | `Component` | `TextMorph`                    | Component used to render the meta title/subtitle. Receives `as` and `children`. Defaults to metamorphosis's morphing `TextMorph`; pass `PlainCaption` (or your own) to opt out. |
+| `lightboxControls`  | `boolean` | `false`                          | Show prev / close / next buttons in the lightbox (on all breakpoints). Off by default — the caption carries the context, and swipe / arrow keys navigate. |
 
 ## `<Lightbox>` props (internal)
 
@@ -139,11 +143,21 @@ its props:
 | `items`               | `Item[]`   | —       | Same item array passed to `<Slider>`.                |
 | `activeIndex`         | `number`   | —       | Index to open on.                                    |
 | `sizes`               | `string`   | `84vw`  | `sizes` hint for the images.                         |
+| `controls`            | `boolean`  | `false` | Render the prev / close / next buttons (on all breakpoints). |
 | `onActiveIndexChange` | `Function` | —       | Called with the new index as the user scrolls.       |
 | `onClose`             | `Function` | —       | Called to dismiss the lightbox.                      |
 
-On mobile (`< 700px`) the lightbox shows a fixed control bar with prev / close /
-next buttons; prev and next dim and disable at the first and last slide.
+Controls are off by default — the caption carries the context, and swipe / drag /
+arrow keys navigate. Enable them with `lightboxControls` on `<Slider>` (or
+`controls` on `<Lightbox>`): a fixed bar with prev / close / next buttons appears
+below the caption on all breakpoints, with prev / next dimmed and disabled at the
+first and last slide.
+
+On mobile the lightbox can be dismissed by dragging the image down: the focused
+image follows your finger while the neighbours and backdrop fade out, and past a
+short threshold (or a quick flick) it closes — animating from where you released
+straight back to its slider panel. Below the threshold it springs back.
+Horizontal swipes still navigate.
 
 ## Item shape
 
