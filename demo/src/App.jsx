@@ -45,10 +45,7 @@ export default function App() {
         <div className="subgrid">
           <header className="page__header">
             <h1>Vitrine</h1>
-<<<<<<< HEAD
             <p>Opinionated gallery slider with lightbox and video support.</p>
-=======
->>>>>>> 39ab4a6697c7b614718123559c5cc667ca300f4a
             <p>
               Images from the{" "}
               <a
