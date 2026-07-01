@@ -230,6 +230,10 @@ ul {
   color: var(--text-color);
 }
 
+.credit {
+  padding-top: 0.5em;
+}
+
 /* Visually hidden, but still announced by screen readers. */
 .sr-only {
   position: absolute;
@@ -513,6 +517,23 @@ ul {
   }
 }
 
+/* Usage snippet — anchors the copy button to the top-right of the code block. */
+.usage {
+  position: relative;
+  margin-top: 0.5lh;
+}
+
+/* The wrapper owns the top margin so the button anchors to the block's edge. */
+.usage pre {
+  margin-top: 0;
+}
+
+.usage__copy {
+  position: absolute;
+  top: 0.8rem;
+  right: 0.8rem;
+}
+
 .credits {
   display: flex;
   flex-direction: column;
@@ -532,7 +553,6 @@ ul {
   display: inline-flex;
   vertical-align: middle;
   align-items: center;
-  gap: 0.6rem;
   cursor: pointer;
   color: inherit;
   text-underline-offset: 2px;
@@ -544,38 +564,60 @@ ul {
   border-radius: 2px;
 }
 
+/* The reveal animates the icon's reserved width (and its trailing gap) rather
+   than a negative margin, so the icon never overlaps neighbouring inline text
+   while it appears. The glyph itself is absolutely positioned inside this box so
+   it can scale/rotate/fade in place without affecting layout. */
 .icon-link__icon {
   position: relative;
-  display: inline-flex;
-  width: 0.75em;
+  display: inline-block;
+  width: 0;
   height: 0.75em;
+  margin-right: 0;
   flex-shrink: 0;
-  margin-left: -1.6rem;
-  opacity: 0;
-  transform: scale(0.6);
   transition:
-    margin-left 0.3s cubic-bezier(0, 0.55, 0.45, 1),
-    opacity 0.3s cubic-bezier(0, 0.55, 0.45, 1),
-    transform 0.35s cubic-bezier(0.34, 1.56, 0.64, 1);
+    width 0.3s cubic-bezier(0, 0.55, 0.45, 1),
+    margin-right 0.3s cubic-bezier(0, 0.55, 0.45, 1);
 }
 
 .icon-link__icon svg {
-  height: 100%;
-  width: 100%;
+  position: absolute;
+  top: 50%;
+  left: 0;
+  width: 0.75em;
+  height: 0.75em;
+  transform-origin: left center;
+  transform: translateY(-50%) scale(0.3);
+  opacity: 0;
+  filter: blur(2px);
+  transition:
+    opacity 0.25s ease,
+    filter 0.3s ease,
+    transform 0.4s cubic-bezier(0.34, 1.56, 0.64, 1);
 }
 
 @media (hover: hover) and (pointer: fine) {
   .icon-link:hover .icon-link__icon {
-    margin-left: 0;
+    width: 0.75em;
+    margin-right: 0.6rem;
+  }
+
+  .icon-link:hover .icon-link__icon svg {
     opacity: 1;
-    transform: scale(1);
+    filter: blur(0);
+    transform: translateY(-50%) scale(1);
   }
 }
 
 @media not all and (hover: hover) {
   .icon-link__icon {
-    margin-left: 0;
+    width: 0.75em;
+    margin-right: 0.6rem;
+  }
+
+  .icon-link__icon svg {
     opacity: 1;
-    transform: scale(1);
+    filter: blur(0);
+    transform: translateY(-50%) scale(1);
   }
 }

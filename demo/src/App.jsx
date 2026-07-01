@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { TextMorph } from "metamorphosis/react";
 import { IconLink } from "./IconLink";
+import { ArrowIcon } from "./ArrowIcon";
 // Import the library straight from source — the demo doubles as a smoke test of
 // the package's public entry. Consumers instead import from "vitrine".
 import { Slider } from "../../src/index.jsx";
@@ -16,6 +17,12 @@ const INSTALL = [
   { id: "bun", cmd: "bun i github:olicarignan/vitrine" },
   { id: "yarn", cmd: "yarn add github:olicarignan/vitrine" },
 ];
+
+// Usage snippet shown under the install tabs, also the copy target.
+const USAGE = `import { Slider } from "vitrine";
+import "vitrine/styles.css";
+
+<Slider items={items} />;`;
 
 export default function App() {
   const [projects, setProjects] = useState(null);
@@ -46,16 +53,12 @@ export default function App() {
           <header className="page__header">
             <h1>Vitrine</h1>
             <p>Opinionated gallery slider with lightbox and video support.</p>
-            <p>
-              Images from the{" "}
-              <a
-                href="https://www.artic.edu/"
-                target="_blank"
-                rel="noopener noreferrer"
-              >
+            <div className="credit">
+              <span>Images from the</span>
+              <IconLink href="https://www.artic.edu/" icon={<ArrowIcon />}>
                 Art Institue of Chicago
-              </a>
-            </p>
+              </IconLink>
+            </div>
           </header>
         </div>
       </div>
@@ -86,12 +89,12 @@ export default function App() {
             <h2>Install</h2>
             <InstallTabs />
             <h3>Usage</h3>
-            <pre>
-              <code>{`import { Slider } from "vitrine";
-import "vitrine/styles.css";
-
-<Slider items={items} />;`}</code>
-            </pre>
+            <div className="usage">
+              <pre>
+                <code>{USAGE}</code>
+              </pre>
+              <CopyButton className="usage__copy" text={USAGE} label="Copy usage snippet" />
+            </div>
             <p className="install__link">
               For documentation, check the project on{" "}
               <a
@@ -130,21 +133,6 @@ const GitHubIcon = () => (
  */
 function InstallTabs() {
   const [active, setActive] = useState(0);
-  const [copied, setCopied] = useState(false);
-  const resetTimer = useRef(null);
-
-  useEffect(() => () => clearTimeout(resetTimer.current), []);
-
-  const copyCommand = async () => {
-    try {
-      await navigator.clipboard.writeText(INSTALL[active].cmd);
-      setCopied(true);
-      clearTimeout(resetTimer.current);
-      resetTimer.current = setTimeout(() => setCopied(false), 1500);
-    } catch (err) {
-      console.error("Failed to copy:", err);
-    }
-  };
 
   return (
     <div className="install">
@@ -160,10 +148,7 @@ function InstallTabs() {
             role="tab"
             aria-selected={i === active}
             className={i === active ? "is-active" : undefined}
-            onClick={() => {
-              setActive(i);
-              setCopied(false);
-            }}
+            onClick={() => setActive(i)}
           >
             {m.id}
           </button>
@@ -177,23 +162,49 @@ function InstallTabs() {
           </TextMorph>
         </div>
 
-        <button
-          type="button"
-          className={`install__copy${copied ? " is-copied" : ""}`}
-          onClick={copyCommand}
-          aria-label={copied ? "Copied" : "Copy install command"}
-        >
-          <span className="install__copy-icons">
-            <span className="install__copy-icon install__copy-icon--copy">
-              <CopyIcon />
-            </span>
-            <span className="install__copy-icon install__copy-icon--check">
-              <CheckIcon />
-            </span>
-          </span>
-        </button>
+        <CopyButton text={INSTALL[active].cmd} label="Copy install command" />
       </div>
     </div>
+  );
+}
+
+/**
+ * Copy-to-clipboard button whose copy icon morphs into a checkmark for a beat
+ * after a successful copy. Shared by the install command and the usage snippet.
+ */
+function CopyButton({ text, label, className }) {
+  const [copied, setCopied] = useState(false);
+  const resetTimer = useRef(null);
+
+  useEffect(() => () => clearTimeout(resetTimer.current), []);
+
+  const copy = async () => {
+    try {
+      await navigator.clipboard.writeText(text);
+      setCopied(true);
+      clearTimeout(resetTimer.current);
+      resetTimer.current = setTimeout(() => setCopied(false), 1500);
+    } catch (err) {
+      console.error("Failed to copy:", err);
+    }
+  };
+
+  return (
+    <button
+      type="button"
+      className={`install__copy${className ? ` ${className}` : ""}${copied ? " is-copied" : ""}`}
+      onClick={copy}
+      aria-label={copied ? "Copied" : label}
+    >
+      <span className="install__copy-icons">
+        <span className="install__copy-icon install__copy-icon--copy">
+          <CopyIcon />
+        </span>
+        <span className="install__copy-icon install__copy-icon--check">
+          <CheckIcon />
+        </span>
+      </span>
+    </button>
   );
 }
 
