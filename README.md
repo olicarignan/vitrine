@@ -34,6 +34,9 @@ This repo is both the published library and a live demo:
   lightbox.
 - Optional prev / close / next control bar in the lightbox (`lightboxControls`),
   off by default.
+- Optional morphing icon cursor (`morphCursor`) that follows the pointer and
+  animates between `+` (slider panel), `×` (active lightbox item / overlay) and
+  `←` / `→` (previous / next items), off by default.
 - Keyboard navigation: `←` / `→` move the slider while it's focused or hovered,
   and drive the lightbox (`←` / `→` / `Esc`) while it's open.
 
@@ -83,7 +86,8 @@ import "vitrine/styles.css";
 ```
 
 The stylesheet is self-contained — the custom zoom cursors are inlined as data
-URIs, so there are no asset files to host.
+URIs, so there are no asset files to host. Opt into a morphing icon cursor with
+the `morphCursor` prop (see below).
 
 ### Plain (non-animated) caption
 
@@ -99,6 +103,31 @@ import { Slider, PlainCaption } from "vitrine";
 
 Any component with the `({ as, children })` contract works as a `Caption` —
 bring your own.
+
+### Morphing icon cursor
+
+By default the slider uses static inline-SVG cursors (`+` to zoom in, `×` to
+close). Pass `morphCursor` to replace them with a single cursor that follows the
+pointer and **morphs** between icons depending on what's under it — powered by
+`metamorphosis`'s `IconMorph`:
+
+```jsx
+<Slider items={items} morphCursor />;
+```
+
+| Context   | Hovered target                     | Icon         |
+| --------- | ---------------------------------- | ------------ |
+| Slider    | a panel                            | `+`          |
+| Lightbox  | the active (centered) item         | `×`          |
+| Lightbox  | the overlay (backdrop / empty gaps)| `×`          |
+| Lightbox  | the previous item                  | `←`          |
+| Lightbox  | the next item                      | `→`          |
+
+The cursor is white with a dark outline for contrast on any background. It only
+activates on precise pointers (`pointer: fine`); touch devices, no-JS, and
+`prefers-reduced-motion` fall back to the static cursors (the latter swaps icons
+instantly instead of morphing). No extra setup — `IconMorph` ships with
+`metamorphosis`, which is already a dependency.
 
 ### Required CSS tokens
 
@@ -130,6 +159,7 @@ To get the rest of the page to cross-fade during the zoom, also set
 | `lightboxSizes`     | `string` | `84vw`                             | `sizes` hint forwarded to the lightbox images.                     |
 | `Caption`           | `Component` | `TextMorph`                    | Component used to render the meta title/subtitle. Receives `as` and `children`. Defaults to metamorphosis's morphing `TextMorph`; pass `PlainCaption` (or your own) to opt out. |
 | `lightboxControls`  | `boolean` | `false`                          | Show prev / close / next buttons in the lightbox (on all breakpoints). Off by default — the caption carries the context, and swipe / arrow keys navigate. |
+| `morphCursor`       | `boolean` | `false`                          | Replace the static SVG cursors with a morphing icon cursor: `+` over a panel, `×` over the active lightbox item / overlay, `←` / `→` over the previous / next items. Precise-pointer only; touch and no-JS keep the static cursors. |
 
 ## `<Lightbox>` props (internal)
 
