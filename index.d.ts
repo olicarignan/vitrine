@@ -22,9 +22,16 @@ export interface SliderItem {
   highResSrc?: string;
   highResSrcSet?: string;
   highResWebpSrcSet?: string;
-  /** Looping muted video URL; autoplays only while the panel is active. */
+  /**
+   * Looping muted video URL; autoplays only while the panel is active.
+   * Ignored by the `stack` and `coverflow` track variants (poster only) —
+   * the lightbox still plays it.
+   */
   video?: string;
 }
+
+/** Track layout of the slider. */
+export type SliderVariant = "row" | "stack" | "coverflow";
 
 /** Props passed to the `Caption` component (matching metamorphosis's `TextMorph`). */
 export interface CaptionProps {
@@ -35,6 +42,12 @@ export interface CaptionProps {
 export interface SliderProps {
   /** The panels. */
   items: SliderItem[];
+  /**
+   * Track layout: the scroll-snap carousel (default), a deck-cycling card
+   * stack, or a 3D coverflow. Stack and coverflow ignore `item.video` in the
+   * track (poster only — the lightbox still plays it). Default `"row"`.
+   */
+  variant?: SliderVariant;
   /** Desktop width (px) of the active panel's content column. Default `628`. */
   contentWidth?: number;
   /** Desktop gap (px) between panels. Default `32`. */
@@ -58,6 +71,36 @@ export interface SliderProps {
    */
   Caption?: ComponentType<CaptionProps>;
   /**
+   * Set `false` to disable the lightbox entirely: clicking a panel no longer
+   * zooms; the active panel's click instead fires `onItemClick` (if given).
+   * Default `true`.
+   */
+  lightbox?: boolean;
+  /**
+   * Show prev / close / next buttons in the lightbox (on all breakpoints).
+   * Default `false`.
+   */
+  lightboxControls?: boolean;
+  /** Called with `(item, index)` when the active panel is clicked and `lightbox` is `false`. */
+  onItemClick?: (item: SliderItem, index: number) => void;
+  /** Show prev/next buttons beside the caption. Default `false`. */
+  arrows?: boolean;
+  /**
+   * Show one dot per panel beside the caption; the active dot tracks
+   * scrolling and clicking a dot navigates. Default `false`.
+   */
+  pagination?: boolean;
+  /**
+   * Show play/pause + mute + scrubber over the active video panel (slider and
+   * lightbox). Videos still autoplay muted. Default `false`.
+   */
+  videoControls?: boolean;
+  /**
+   * Override the auto-generated per-instance shared-element
+   * view-transition name.
+   */
+  transitionName?: string;
+  /**
    * Replace the static SVG cursors with a morphing icon cursor that follows the
    * pointer (metamorphosis `IconMorph`): `+` over a slider panel, `×` over the
    * active lightbox item or overlay, and `←`/`→` over the previous/next items.
@@ -79,6 +122,17 @@ export interface LightboxProps {
   activeIndex: number;
   /** `sizes` hint for the images. Default `"84vw"`. */
   sizes?: string;
+  /** Caption renderer (takes `as` + `children`); defaults to metamorphosis's morphing `TextMorph`. */
+  Caption?: ComponentType<CaptionProps>;
+  /** Render the prev / close / next buttons (on all breakpoints). Default `false`. */
+  controls?: boolean;
+  /** Show play/pause + mute + scrubber over the active video item. Default `false`. */
+  videoControls?: boolean;
+  /**
+   * Shared-element view-transition name; `<Slider>` passes its per-instance
+   * name. Default `"slider-active"`.
+   */
+  transitionName?: string;
   /** Called with the new index as the user scrolls. */
   onActiveIndexChange?: (index: number) => void;
   /** Called to dismiss the lightbox. */

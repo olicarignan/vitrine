@@ -6,12 +6,18 @@ import { IconMorph } from "metamorphosis/react";
 // Maps the element under the pointer to the icon the cursor should morph into.
 // Returns null when the pointer isn't over an interactive surface (the cursor
 // hides but keeps its last icon, so it morphs — not pops — on re-entry).
-// `lightboxOpen` selects the slider-vs-lightbox rule set.
-function resolveIcon(target, lightboxOpen) {
+// `lightboxOpen` selects the slider-vs-lightbox rule set; `itemsClickable` is
+// false when the lightbox is disabled with no click callback, so panels aren't
+// interactive and get no icon.
+function resolveIcon(target, lightboxOpen, itemsClickable) {
   if (!target || typeof target.closest !== "function") return null;
 
+  // The video control bar keeps the native cursor — a morphing glyph over a
+  // scrubber reads as noise, and the controls aren't a zoom/close surface.
+  if (target.closest(".vitrine-video-controls")) return null;
+
   if (!lightboxOpen) {
-    return target.closest(".slider__item") ? "plus" : null;
+    return itemsClickable && target.closest(".slider__item") ? "plus" : null;
   }
 
   // The centered item and the overlay (backdrop / empty track runway) both
@@ -36,7 +42,7 @@ function resolveIcon(target, lightboxOpen) {
 // A pointer-following overlay that renders a morphing IconMorph glyph. Opt-in
 // via the `morphCursor` prop on <Slider>; only active on precise pointers
 // (touch keeps the native fallback cursors).
-export function MorphCursor({ lightboxOpen }) {
+export function MorphCursor({ lightboxOpen, itemsClickable = true }) {
   const wrapRef = useRef(null);
   const rafRef = useRef(0);
   const posRef = useRef({ x: 0, y: 0 });
@@ -77,7 +83,7 @@ export function MorphCursor({ lightboxOpen }) {
         });
       }
 
-      const next = resolveIcon(e.target, lightboxOpen);
+      const next = resolveIcon(e.target, lightboxOpen, itemsClickable);
       if (next) {
         setIcon(next);
         setVisible(true);
@@ -99,7 +105,7 @@ export function MorphCursor({ lightboxOpen }) {
       if (rafRef.current) cancelAnimationFrame(rafRef.current);
       rafRef.current = 0;
     };
-  }, [enabled, lightboxOpen]);
+  }, [enabled, lightboxOpen, itemsClickable]);
 
   if (!enabled) return null;
 

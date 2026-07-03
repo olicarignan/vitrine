@@ -1,0 +1,116 @@
+/* Opt-in video playback controls (<Slider videoControls />): a pill bar pinned
+   to the bottom edge of the active video panel, in the slider and the lightbox.
+   White-on-scrim like the lightbox controls, so it reads on any footage. */
+
+.vitrine-video-controls {
+  position: absolute;
+  left: 1.2rem;
+  right: 1.2rem;
+  bottom: 1.2rem;
+  z-index: 3;
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  padding: 0.4rem 0.8rem;
+  border-radius: 999px;
+  color: #fff;
+  background: rgba(0, 0, 0, 0.35);
+  backdrop-filter: blur(12px);
+  /* The panel's zoom / morph cursors stop at the controls. */
+  cursor: auto;
+  /* Fade in with the video (the *--video-ready crossfade), out when inactive. */
+  opacity: 0;
+  transition: opacity 0.3s ease;
+}
+
+.slider__item--video-ready .vitrine-video-controls,
+.lightbox__item--video-ready .vitrine-video-controls {
+  opacity: 1;
+}
+
+.vitrine-video-controls__btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  width: 2.8rem;
+  height: 2.8rem;
+  padding: 0;
+  border: none;
+  border-radius: 50%;
+  color: inherit;
+  background: none;
+  cursor: pointer;
+  transition: background 0.25s ease;
+
+  @media (hover: hover) {
+    &:hover {
+      background: rgba(255, 255, 255, 0.15);
+    }
+  }
+
+  &:focus-visible {
+    outline: 2px solid #fff;
+    outline-offset: 1px;
+  }
+}
+
+.vitrine-video-controls__scrubber {
+  flex: 1;
+  min-width: 0;
+  height: 2.8rem;
+  margin: 0;
+  appearance: none;
+  -webkit-appearance: none;
+  background: none;
+  cursor: pointer;
+  /* Touch-scrubbing must never pan the track or start a drag-down dismiss. */
+  touch-action: none;
+
+  &:disabled {
+    opacity: 0.5;
+    cursor: default;
+  }
+
+  &::-webkit-slider-runnable-track {
+    height: 3px;
+    border-radius: 999px;
+    background: rgba(255, 255, 255, 0.3);
+  }
+
+  &::-webkit-slider-thumb {
+    appearance: none;
+    -webkit-appearance: none;
+    width: 11px;
+    height: 11px;
+    margin-top: -4px;
+    border: none;
+    border-radius: 50%;
+    background: #fff;
+  }
+
+  &::-moz-range-track {
+    height: 3px;
+    border-radius: 999px;
+    background: rgba(255, 255, 255, 0.3);
+  }
+
+  &::-moz-range-progress {
+    height: 3px;
+    border-radius: 999px;
+    background: #fff;
+  }
+
+  &::-moz-range-thumb {
+    width: 11px;
+    height: 11px;
+    border: none;
+    border-radius: 50%;
+    background: #fff;
+  }
+
+  &:focus-visible {
+    outline: 2px solid #fff;
+    outline-offset: 2px;
+  }
+}

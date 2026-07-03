@@ -230,7 +230,8 @@ ul {
   color: var(--text-color);
 }
 
-.credit {
+.credit,
+.features {
   padding-top: 0.5em;
 }
 
@@ -620,4 +621,98 @@ ul {
     filter: blur(0);
     transform: translateY(-50%) scale(1);
   }
+}
+
+/* Docs section (/docs routes) */
+
+.docs__header h1 a {
+  color: inherit;
+}
+
+.docs__crumb {
+  color: var(--color-grey);
+  font-weight: 375;
+}
+
+/* Page nav — same quiet tab language as the install tabs. */
+.docs__nav {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem 1.6rem;
+  margin-top: 0.75lh;
+}
+
+.docs__nav a {
+  font-size: 1.4rem;
+  font-weight: 375;
+  letter-spacing: -0.01em;
+  padding: 0.4rem 0;
+  color: var(--color-grey);
+  transition: color 0.2s ease;
+}
+
+.docs__nav a:hover {
+  color: var(--color-black);
+}
+
+.docs__nav a.active {
+  color: var(--color-black);
+  font-weight: 475;
+}
+
+.docs__intro {
+  grid-column: 1 / -1;
+  margin-top: 1.5lh;
+}
+
+.docs__intro p {
+  color: var(--text-color);
+  max-width: 52ch;
+}
+
+.docs__intro code,
+.docs__block code {
+  font-family: var(--font-mono);
+  font-size: 0.85em;
+  color: var(--color-black);
+}
+
+/* The sliders own their large block margins; the code/table block below the
+   last one just needs a little breathing room before the footer. */
+.docs__block {
+  margin-top: -2lh;
+
+  p {
+    max-width: 60ch;
+  }
+}
+
+/* Prop-reference table */
+.props-table {
+  margin-top: 0.5lh;
+  overflow-x: auto;
+}
+
+.props-table table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 1.4rem;
+  line-height: 1.5;
+}
+
+.props-table th {
+  text-align: left;
+  font-weight: 475;
+  color: var(--color-black);
+}
+
+.props-table th,
+.props-table td {
+  padding: 0.8rem 2.4rem 0.8rem 0;
+  border-bottom: 1px solid color-mix(in srgb, var(--color-black) 10%, transparent);
+  vertical-align: top;
+}
+
+.props-table td:last-child {
+  padding-right: 0;
 }

@@ -9,6 +9,8 @@ import {
 } from "react";
 import { motion } from "motion/react";
 import { TextMorph } from "metamorphosis/react";
+import { ChevronLeftIcon, ChevronRightIcon, CloseIcon } from "./icons";
+import { VideoControls } from "./VideoControls";
 
 // Mobile drag-down-to-dismiss: release past this drop distance (px) or flick
 // velocity (px per ms) dismisses; otherwise the image springs back.
@@ -25,6 +27,8 @@ const DISMISS_VELOCITY = 0.55;
  * @param {string}   [props.sizes="84vw"]       `sizes` hint for the images.
  * @param {React.ElementType} [props.Caption]   Caption renderer (takes `as` + `children`); defaults to metamorphosis's morphing `<TextMorph>`, matching the slider.
  * @param {boolean}  [props.controls=false]     Render the prev/close/next buttons (on all breakpoints).
+ * @param {boolean}  [props.videoControls=false] Show play/pause + mute + scrubber over the active video item.
+ * @param {string}   [props.transitionName="slider-active"] Shared-element view-transition name; `<Slider>` passes its per-instance name.
  * @param {Function} props.onActiveIndexChange  Called with the new index as the user scrolls.
  * @param {Function} props.onClose              Called to dismiss the lightbox.
  */
@@ -34,6 +38,8 @@ export function Lightbox({
   sizes = "84vw",
   Caption = TextMorph,
   controls = false,
+  videoControls = false,
+  transitionName = "slider-active",
   onActiveIndexChange,
   onClose,
 }) {
@@ -538,6 +544,8 @@ export function Lightbox({
             activeIndex={activeIndex}
             sizes={sizes}
             staggerDone={staggerDone}
+            transitionName={transitionName}
+            videoControls={videoControls}
             onClick={handleItemClick}
           />
         ))}
@@ -548,75 +556,48 @@ export function Lightbox({
       </div>
       {controls && (
         <div className="lightbox__controls">
-        <button
-          className="lightbox__nav"
-          onClick={() => scrollToIndex(activeIndex - 1)}
-          disabled={activeIndex === 0}
-          aria-label="Previous"
-        >
-          <svg
-            width="14"
-            height="14"
-            viewBox="0 0 14 14"
-            fill="none"
-            xmlns="http://www.w3.org/2000/svg"
+          <button
+            className="lightbox__nav"
+            onClick={() => scrollToIndex(activeIndex - 1)}
+            disabled={activeIndex === 0}
+            aria-label="Previous"
           >
-            <path
-              d="M9 1L3 7L9 13"
-              stroke="currentColor"
-              strokeWidth="1.5"
-              strokeLinecap="round"
-              strokeLinejoin="round"
-            />
-          </svg>
-        </button>
-        <button className="lightbox__close" onClick={onClose} aria-label="Close">
-          <svg
-            width="14"
-            height="14"
-            viewBox="0 0 14 14"
-            fill="none"
-            xmlns="http://www.w3.org/2000/svg"
+            <ChevronLeftIcon />
+          </button>
+          <button
+            className="lightbox__close"
+            onClick={onClose}
+            aria-label="Close"
           >
-            <path
-              d="M1 1L13 13M13 1L1 13"
-              stroke="currentColor"
-              strokeWidth="1.5"
-              strokeLinecap="round"
-            />
-          </svg>
-        </button>
-        <button
-          className="lightbox__nav"
-          onClick={() => scrollToIndex(activeIndex + 1)}
-          disabled={activeIndex === items.length - 1}
-          aria-label="Next"
-        >
-          <svg
-            width="14"
-            height="14"
-            viewBox="0 0 14 14"
-            fill="none"
-            xmlns="http://www.w3.org/2000/svg"
+            <CloseIcon />
+          </button>
+          <button
+            className="lightbox__nav"
+            onClick={() => scrollToIndex(activeIndex + 1)}
+            disabled={activeIndex === items.length - 1}
+            aria-label="Next"
           >
-            <path
-              d="M5 1L11 7L5 13"
-              stroke="currentColor"
-              strokeWidth="1.5"
-              strokeLinecap="round"
-              strokeLinejoin="round"
-            />
-          </svg>
-        </button>
+            <ChevronRightIcon />
+          </button>
         </div>
       )}
     </div>
   );
 }
 
-function LightboxItem({ item, index, activeIndex, sizes, staggerDone, onClick }) {
+function LightboxItem({
+  item,
+  index,
+  activeIndex,
+  sizes,
+  staggerDone,
+  transitionName,
+  videoControls,
+  onClick,
+}) {
   const hasHighRes = Boolean(item.highResSrc);
   const videoUrl = item.video;
+  const videoRef = useRef(null);
   const isActive = index === activeIndex;
   const dist = Math.abs(index - activeIndex);
   const [highResLoaded, setHighResLoaded] = useState(false);
@@ -625,13 +606,20 @@ function LightboxItem({ item, index, activeIndex, sizes, staggerDone, onClick })
     <div
       className={`lightbox__item${isActive ? " lightbox__item--active" : ""}`}
       data-index={index}
-      // Stagger delay is only for the initial reveal; once that's done we drop it
-      // so navigation dims the outgoing item and brightens the incoming one on
+      // The active item carries the per-instance shared-element name (inline —
+      // the name is dynamic, so it can't live in the stylesheet). The stagger
+      // delay is only for the initial reveal; once that's done we drop it so
+      // navigation dims the outgoing item and brightens the incoming one on
       // identical timing.
       style={
-        !isActive && !staggerDone
-          ? { transitionDelay: `${dist * 0.06}s` }
-          : undefined
+        isActive
+          ? {
+              viewTransitionName: transitionName,
+              viewTransitionClass: "vitrine-shared",
+            }
+          : !staggerDone
+            ? { transitionDelay: `${dist * 0.06}s` }
+            : undefined
       }
       onClick={() => onClick(index)}
     >
@@ -678,13 +666,18 @@ function LightboxItem({ item, index, activeIndex, sizes, staggerDone, onClick })
       )}
       {videoUrl && (
         <video
+          ref={videoRef}
           src={videoUrl}
           muted
           playsInline
           loop
-          preload="none"
+          // The scrubber needs the duration up front; without controls stay lazy.
+          preload={videoControls ? "metadata" : "none"}
           draggable={false}
         />
+      )}
+      {videoUrl && videoControls && isActive && (
+        <VideoControls videoRef={videoRef} />
       )}
     </div>
   );

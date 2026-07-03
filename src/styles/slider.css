@@ -141,8 +141,132 @@
     }
   }
 
+  /* Deck-cycling variant (`variant="stack"`): the track is a fixed-height
+     stage, cards are absolutely positioned uniform boxes moved only by
+     transform + z-index (set inline by StackTrack). */
+  .slider__track--stack {
+    display: block;
+    overflow: visible;
+    scroll-snap-type: none;
+    gap: 0;
+    padding-block: 0;
+    margin-block: 0;
+    position: relative;
+
+    .slider__item {
+      position: absolute;
+      top: 0;
+      max-width: none;
+      will-change: transform;
+
+      @media (max-width: 699px) {
+        width: auto;
+      }
+    }
+
+    .slider__item-inner {
+      width: 100%;
+      height: 100%;
+      /* The stage transform belongs to the card (motion); disable the hover
+         lift so the two never fight. */
+      transition: none;
+
+      @media (hover: hover) {
+        &:hover {
+          translate: none;
+          transform: none;
+          filter: drop-shadow(0 6px 24px rgba(0, 0, 0, 0.1));
+        }
+      }
+    }
+
+    /* Uniform card box: cover-crop the poster into it so deck edges align.
+       (No video in this variant — the lightbox still plays it.) */
+    picture {
+      display: block;
+      width: 100%;
+      height: 100%;
+    }
+
+    .slider__item img {
+      width: 100%;
+      height: 100%;
+      max-width: none;
+      max-height: none;
+      object-fit: cover;
+    }
+
+    /* Soft edge so the peeking back cards read against the top one. */
+    .slider__item:not(.slider__item--active) .slider__item-inner {
+      box-shadow: 0 -4px 16px rgba(0, 0, 0, 0.08);
+    }
+  }
+
+  /* Coverflow variant (`variant="coverflow"`): the row engine in centered mode;
+     the projector writes rotateY/translateZ/scale on each item's inner. */
+  .slider__track--coverflow {
+    /* Shared vanishing point for all panels. */
+    perspective: 1200px;
+    /* Rotated corners swing above/below the item box — widen the clip
+       compensation so they don't get cut. */
+    padding-block: 96px;
+    margin-block: -96px;
+    /* Classic coverflow ribbon: no gap, slight overlap via negative margins
+       (the rotation + recede keep neighbors visually separated). */
+    gap: 0;
+
+    .slider__item {
+      position: relative;
+      scroll-snap-align: center;
+      width: var(--item-max-w);
+      height: var(--item-max-h);
+      max-width: none;
+      margin-inline: calc(var(--item-max-w) * -0.08);
+      /* The 3D transform lives on the inner (a grandchild of the track);
+         without preserve-3d the track's perspective never reaches it and the
+         rotation renders flat. */
+      transform-style: preserve-3d;
+    }
+
+    .slider__item-inner {
+      width: 100%;
+      height: 100%;
+      /* The projector owns the transform every frame; transitions (and the
+         hover lift) would fight it. */
+      transition: none;
+      will-change: transform;
+
+      @media (hover: hover) {
+        &:hover {
+          translate: none;
+          filter: none;
+        }
+      }
+    }
+
+    /* Uniform cover-cropped box so the 3D row reads as one ribbon.
+       (No video in this variant — the lightbox still plays it.) */
+    picture {
+      display: block;
+      width: 100%;
+      height: 100%;
+    }
+
+    .slider__item img {
+      width: 100%;
+      height: 100%;
+      max-width: none;
+      max-height: none;
+      object-fit: cover;
+    }
+  }
+
   .slider__meta {
     margin-top: 0.75lh;
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 1.6rem;
 
     h3 {
       color: var(--accent-color);
@@ -150,6 +274,79 @@
     }
     p {
       color: var(--text-color);
+    }
+  }
+
+  /* Opt-in prev/next arrows and pagination dots (`arrows` / `pagination`),
+     sitting to the right of the caption. Buttons follow .lightbox__nav. */
+  .slider__controls {
+    display: flex;
+    align-items: center;
+    gap: 0.8rem;
+    flex-shrink: 0;
+  }
+
+  .slider__nav {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 3.6rem;
+    height: 3.6rem;
+    padding: 0;
+    border: none;
+    border-radius: 10px;
+    color: var(--color-text);
+    cursor: pointer;
+    background: color-mix(in srgb, var(--accent-color) 10%, transparent);
+    transition: background 0.25s ease;
+
+    @media (hover: hover) {
+      &:hover:not(:disabled) {
+        background: color-mix(in srgb, var(--accent-color) 18%, transparent);
+      }
+    }
+
+    &:disabled {
+      opacity: 0.35;
+      cursor: default;
+    }
+
+    &:focus-visible {
+      outline: 2px solid var(--accent-color);
+      outline-offset: 2px;
+    }
+  }
+
+  .slider__dots {
+    display: flex;
+    align-items: center;
+    gap: 0.8rem;
+    padding-inline: 0.4rem;
+  }
+
+  .slider__dot {
+    width: 0.7rem;
+    height: 0.7rem;
+    padding: 0;
+    border: none;
+    border-radius: 50%;
+    cursor: pointer;
+    background: color-mix(in srgb, var(--accent-color) 25%, transparent);
+    transition: background 0.25s ease;
+
+    @media (hover: hover) {
+      &:hover {
+        background: color-mix(in srgb, var(--accent-color) 50%, transparent);
+      }
+    }
+
+    &.slider__dot--active {
+      background: var(--accent-color);
+    }
+
+    &:focus-visible {
+      outline: 2px solid var(--accent-color);
+      outline-offset: 2px;
     }
   }
 }
