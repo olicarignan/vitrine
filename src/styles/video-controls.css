@@ -1,0 +1,228 @@
+/* Video playback UI (<Slider videoControls />). Two surfaces:
+   - Slider: no persistent UI. Hovering the active panel reveals a centered
+     morphing play/pause toggle and softly blurs the video behind it.
+   - Lightbox: a minified progress bar at rest that expands on hover to reveal
+     the timestamp plus mute / picture-in-picture / fullscreen buttons.
+   White-on-scrim throughout, so the controls read over any footage. */
+
+/* ---- Slider: hover play/pause toggle ---------------------------------- */
+
+.vitrine-video-toggle {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%) scale(0.9);
+  z-index: 4;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  border: none;
+  background: none;
+  color: #fff;
+  cursor: pointer;
+  /* Chromeless — a drop-shadow gives the bare glyph contrast on any footage. */
+  filter: drop-shadow(0 2px 7px rgba(0, 0, 0, 0.5));
+  /* Hidden and inert until the panel is hovered (see below), so clicks pass
+     through to the panel — which opens (slider) or closes (lightbox) it. */
+  opacity: 0;
+  pointer-events: none;
+  transition:
+    opacity 0.2s ease,
+    transform 0.2s ease;
+
+  &:focus-visible {
+    outline: 2px solid rgba(255, 255, 255, 0.9);
+    outline-offset: 6px;
+    border-radius: 50%;
+  }
+}
+
+@media (hover: hover) {
+  .slider__item--active .slider__item-inner:hover .vitrine-video-toggle,
+  .lightbox__item:hover .vitrine-video-toggle {
+    opacity: 1;
+    pointer-events: auto;
+    transform: translate(-50%, -50%) scale(1);
+  }
+
+  .slider__item--active .slider__item-inner:hover video {
+    filter: blur(3px) brightness(0.92);
+  }
+}
+
+/* ---- Lightbox: progress bar + hover controls -------------------------- */
+
+.vitrine-lb-video {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  padding: 0 1.4rem 1.2rem;
+  color: #fff;
+  cursor: auto;
+  /* No scrim and no z-index: the bar paints above the video via DOM order, and
+     without an isolating stacking context the progress bar's blend can reach
+     the video behind it (see .vitrine-lb-video__progress). */
+  /* The empty area ignores the pointer so clicks fall through to the video
+     (which closes the lightbox); the progress bar and, on hover, the button
+     row opt back in. */
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity 0.3s ease;
+}
+
+.lightbox__item--video-ready .vitrine-lb-video {
+  opacity: 1;
+}
+
+.vitrine-lb-video__bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1.2rem;
+  margin-bottom: 0.7rem;
+  opacity: 0;
+  transform: translateY(6px);
+  pointer-events: none;
+  /* Keeps the white text/icons legible now that the scrim is gone. */
+  filter: drop-shadow(0 1px 4px rgba(0, 0, 0, 0.5));
+  transition:
+    opacity 0.25s ease,
+    transform 0.25s ease;
+}
+
+.vitrine-lb-video__time {
+  font-size: 1.3rem;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: -0.01em;
+  text-shadow: 0 1px 3px rgba(0, 0, 0, 0.5);
+}
+
+.vitrine-lb-video__actions {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+}
+
+.vitrine-lb-video__btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 3rem;
+  height: 3rem;
+  padding: 0;
+  border: none;
+  border-radius: 50%;
+  color: inherit;
+  background: none;
+  cursor: pointer;
+  transition: background 0.2s ease;
+
+  @media (hover: hover) {
+    &:hover {
+      background: rgba(255, 255, 255, 0.18);
+    }
+  }
+
+  &:focus-visible {
+    outline: 2px solid #fff;
+    outline-offset: 1px;
+  }
+}
+
+.vitrine-lb-video__progress {
+  position: relative;
+  height: 3px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.3);
+  cursor: pointer;
+  pointer-events: auto;
+  /* Blend the bar (track + fill) against the footage instead of a scrim, so it
+     inverts to stay legible over any frame. */
+  mix-blend-mode: difference;
+  /* Soften and desaturate the footage *before* the difference blend, so the
+     inverted look is preserved but the bar reads calmer over saturated frames.
+     (A plain `filter` runs after the blend and wouldn't touch the inversion.) */
+  backdrop-filter: saturate(0.6) blur(2px);
+  -webkit-backdrop-filter: saturate(0.6) blur(2px);
+  /* Scrubbing must never pan the track or start a drag-down dismiss. */
+  touch-action: none;
+  transition: height 0.2s ease;
+
+  /* Taller invisible hit area so the thin bar stays grabbable. */
+  &::before {
+    content: "";
+    position: absolute;
+    left: 0;
+    right: 0;
+    top: -9px;
+    bottom: -9px;
+  }
+
+  &:focus-visible {
+    outline: 2px solid #fff;
+    outline-offset: 3px;
+  }
+}
+
+/* Translucent seek-ahead indicator: tracks the cursor while the bar is hovered
+   (width set inline), sitting under the solid played fill so it only shows the
+   run *ahead* of the current position. */
+.vitrine-lb-video__preview {
+  position: absolute;
+  left: 0;
+  top: 0;
+  width: 0;
+  height: 100%;
+  border-radius: inherit;
+  background: rgba(255, 255, 255, 0.4);
+  opacity: 0;
+  transition: opacity 0.15s ease;
+}
+
+.vitrine-lb-video__progress-fill {
+  position: absolute;
+  left: 0;
+  top: 0;
+  height: 100%;
+  border-radius: inherit;
+  background: #fff;
+}
+
+@media (hover: hover) {
+  .vitrine-lb-video__progress:hover .vitrine-lb-video__preview {
+    opacity: 1;
+  }
+}
+
+@media (hover: hover) {
+  .lightbox__item:hover .vitrine-lb-video__bar {
+    opacity: 1;
+    transform: none;
+    pointer-events: auto;
+  }
+
+  .lightbox__item:hover .vitrine-lb-video__progress {
+    height: 5px;
+  }
+}
+
+/* Touch: there's no hover, so a tap toggles `--show-controls` on the active
+   video item (see Lightbox.jsx) to reveal the same play toggle + button row the
+   pointer hover state shows above. */
+.lightbox__item--show-controls .vitrine-video-toggle {
+  opacity: 1;
+  pointer-events: auto;
+  transform: translate(-50%, -50%) scale(1);
+}
+
+.lightbox__item--show-controls .vitrine-lb-video__bar {
+  opacity: 1;
+  transform: none;
+  pointer-events: auto;
+}
+
+.lightbox__item--show-controls .vitrine-lb-video__progress {
+  height: 5px;
+}

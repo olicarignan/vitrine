@@ -189,6 +189,52 @@
     opacity: 0;
   }
 
+  /* Coverflow lightbox (`variant="coverflow"`): mirrors the track's styling.
+     Items are uniform cover-cropped boxes — the card ratio arrives inline as
+     --lb-item-aspect, so the shared-element zoom morphs crop → crop with no
+     crossfade — and neighbors carry the 3D rotation, written per frame by the
+     projection helper onto the inner wrapper. The perspective is local to
+     each inner's transform (not a track perspective + preserve-3d chain: the
+     item's filter/opacity choreography would flatten it — see projectItem). */
+  &.lightbox--coverflow {
+    .lightbox__track {
+      gap: 3.2rem;
+    }
+
+    .lightbox__item {
+      aspect-ratio: var(--lb-item-aspect, 1.5);
+      width: min(
+        calc(var(--lb-max-height) * var(--lb-item-aspect, 1.5)),
+        var(--lb-max-width)
+      );
+      height: auto;
+
+      @media (max-width: 699px) {
+        width: var(--lb-item-width);
+      }
+    }
+
+    .lightbox__item-inner {
+      width: 100%;
+      height: 100%;
+      will-change: transform;
+    }
+
+    /* Both image layers fill the fixed box (cover-crop), like the track. */
+    .lightbox__img {
+      width: 100%;
+      height: 100%;
+    }
+
+    .lightbox__item img {
+      width: 100%;
+      height: 100%;
+      max-width: none;
+      max-height: none;
+      object-fit: cover;
+    }
+  }
+
   .lightbox__meta {
     position: fixed;
     left: 0;
@@ -302,18 +348,19 @@
   }
 }
 
-/* View Transitions — shared-element zoom between the slider panel and the lightbox */
-.lightbox__item--active {
-  view-transition-name: slider-active;
-}
-
-::view-transition-group(slider-active) {
+/* View Transitions — shared-element zoom between the slider panel and the
+   lightbox. The view-transition-name is per-instance (so several sliders can
+   coexist) and set inline by the components; these timing rules match on the
+   shared view-transition-class instead. Browsers without view-transition-class
+   support (pre-Chrome 125 / Safari 18.2 / Firefox 139) still run the zoom,
+   just with the default UA timing. */
+::view-transition-group(.vitrine-shared) {
   animation-duration: 0.6s;
   animation-timing-function: cubic-bezier(0.4, 0, 0, 1);
 }
 
-::view-transition-old(slider-active),
-::view-transition-new(slider-active) {
+::view-transition-old(.vitrine-shared),
+::view-transition-new(.vitrine-shared) {
   animation-duration: 0.6s;
   animation-timing-function: cubic-bezier(0.4, 0, 0, 1);
 }

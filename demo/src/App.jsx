@@ -52,7 +52,7 @@ export default function App() {
         <div className="subgrid">
           <header className="page__header">
             <h1>Vitrine</h1>
-            <p>Opinionated gallery slider with lightbox and video support.</p>
+            <p>Opinionated gallery slider with lightbox, video support and alternate layouts.</p>
             <div className="credit">
               <span>Images from the</span>
               <IconLink href="https://www.artic.edu/" icon={<ArrowIcon />}>

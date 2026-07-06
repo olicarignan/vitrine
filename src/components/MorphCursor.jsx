@@ -6,12 +6,25 @@ import { IconMorph } from "metamorphosis/react";
 // Maps the element under the pointer to the icon the cursor should morph into.
 // Returns null when the pointer isn't over an interactive surface (the cursor
 // hides but keeps its last icon, so it morphs — not pops — on re-entry).
-// `lightboxOpen` selects the slider-vs-lightbox rule set.
-function resolveIcon(target, lightboxOpen) {
+// `lightboxOpen` selects the slider-vs-lightbox rule set; `itemsClickable` is
+// false when the lightbox is disabled with no click callback, so panels aren't
+// interactive and get no icon.
+function resolveIcon(target, lightboxOpen, itemsClickable) {
   if (!target || typeof target.closest !== "function") return null;
 
+  // Video controls keep the native cursor — a morphing glyph over the
+  // play/pause toggle or the lightbox scrubber reads as noise, and they aren't
+  // a zoom/close surface.
+  if (target.closest(".vitrine-video-toggle, .vitrine-lb-video")) return null;
+
   if (!lightboxOpen) {
-    return target.closest(".slider__item") ? "plus" : null;
+    // Only over the morph-enabled slider's own items. Other sliders sharing the
+    // page keep their native zoom cursor, so the follower doesn't render its
+    // glyph stacked on top of theirs.
+    const item = target.closest(".slider__item");
+    return itemsClickable && item?.closest(".slider--morph-cursor")
+      ? "plus"
+      : null;
   }
 
   // The centered item and the overlay (backdrop / empty track runway) both
@@ -36,7 +49,7 @@ function resolveIcon(target, lightboxOpen) {
 // A pointer-following overlay that renders a morphing IconMorph glyph. Opt-in
 // via the `morphCursor` prop on <Slider>; only active on precise pointers
 // (touch keeps the native fallback cursors).
-export function MorphCursor({ lightboxOpen }) {
+export function MorphCursor({ lightboxOpen, itemsClickable = true }) {
   const wrapRef = useRef(null);
   const rafRef = useRef(0);
   const posRef = useRef({ x: 0, y: 0 });
@@ -77,7 +90,7 @@ export function MorphCursor({ lightboxOpen }) {
         });
       }
 
-      const next = resolveIcon(e.target, lightboxOpen);
+      const next = resolveIcon(e.target, lightboxOpen, itemsClickable);
       if (next) {
         setIcon(next);
         setVisible(true);
@@ -99,7 +112,7 @@ export function MorphCursor({ lightboxOpen }) {
       if (rafRef.current) cancelAnimationFrame(rafRef.current);
       rafRef.current = 0;
     };
-  }, [enabled, lightboxOpen]);
+  }, [enabled, lightboxOpen, itemsClickable]);
 
   if (!enabled) return null;
 
