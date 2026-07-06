@@ -91,9 +91,10 @@ export async function fetchArtVideos(count = 6, apiKey = ENV_KEY) {
   if (!apiKey) return [];
   try {
     const term = QUERY_TERMS[Math.floor(Math.random() * QUERY_TERMS.length)];
+    // No orientation/size filter — the slider handles mixed aspect ratios, so
+    // letting portrait, square, and landscape clips through makes a livelier set.
     const res = await fetch(
-      `${ENDPOINT}?query=${encodeURIComponent(term)}` +
-        `&per_page=${count}&orientation=landscape&size=medium`,
+      `${ENDPOINT}?query=${encodeURIComponent(term)}&per_page=${count}`,
       { headers: { Authorization: apiKey } },
     );
     if (!res.ok) throw new Error(`Pexels search failed: ${res.status}`);

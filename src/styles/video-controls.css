@@ -207,3 +207,22 @@
     height: 5px;
   }
 }
+
+/* Touch: there's no hover, so a tap toggles `--show-controls` on the active
+   video item (see Lightbox.jsx) to reveal the same play toggle + button row the
+   pointer hover state shows above. */
+.lightbox__item--show-controls .vitrine-video-toggle {
+  opacity: 1;
+  pointer-events: auto;
+  transform: translate(-50%, -50%) scale(1);
+}
+
+.lightbox__item--show-controls .vitrine-lb-video__bar {
+  opacity: 1;
+  transform: none;
+  pointer-events: auto;
+}
+
+.lightbox__item--show-controls .vitrine-lb-video__progress {
+  height: 5px;
+}

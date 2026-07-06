@@ -61,33 +61,41 @@ const QUERY_TERMS = [
   "study",
 ];
 
-// A few real AIC works to fall back to if the network request fails (offline,
-// blocked, etc.) so the demo always has something to show.
+// Reliable fallback set, used to fill the slider when the live AIC fetch comes
+// up short (thin search term) or when AIC's IIIF images are blocked. AIC serves
+// its images from www.artic.edu, which now sits behind a Cloudflare bot
+// challenge that intermittently 403s image requests — so the old AIC-hosted
+// fallback broke in exactly the cases it was meant to cover. These are hosted on
+// the Met's image CDN (images.metmuseum.org) instead, which is CORS-open, plain
+// (no Cloudflare challenge), and long-cached — so the fallback always renders.
+const MET_IMG = "https://images.metmuseum.org/CRDImages";
+
+// `dept`/`file` locate the two fixed Met renditions: `web-large` for the panel
+// and `original` for the lightbox's hi-res upgrade.
+function metItem(id, dept, file, title, artist, date) {
+  return {
+    id: `met-${id}`,
+    title,
+    meta: [artist, date].filter(Boolean).join(" · "),
+    alt: artist ? `${title}, ${artist}` : title,
+    src: `${MET_IMG}/${dept}/web-large/${file}`,
+    highResSrc: `${MET_IMG}/${dept}/original/${file}`,
+  };
+}
+
 const FALLBACK_ITEMS = [
-  {
-    id: 28560,
-    title: "The Bedroom",
-    meta: "Vincent van Gogh · 1889",
-    alt: "The Bedroom, Vincent van Gogh",
-    src: `${IIIF}/6644829f-f292-c5c4-a73c-0356a6fdbf0d/full/${SRC_WIDTH},/0/default.jpg`,
-    highResSrc: `${IIIF}/6644829f-f292-c5c4-a73c-0356a6fdbf0d/full/${HIGH_RES_WIDTH},/0/default.jpg`,
-  },
-  {
-    id: 20684,
-    title: "Paris Street; Rainy Day",
-    meta: "Gustave Caillebotte · 1877",
-    alt: "Paris Street; Rainy Day, Gustave Caillebotte",
-    src: `${IIIF}/f8fd76e9-c396-5678-36ed-6a348c904d27/full/${SRC_WIDTH},/0/default.jpg`,
-    highResSrc: `${IIIF}/f8fd76e9-c396-5678-36ed-6a348c904d27/full/${HIGH_RES_WIDTH},/0/default.jpg`,
-  },
-  {
-    id: 111628,
-    title: "Nighthawks",
-    meta: "Edward Hopper · 1942",
-    alt: "Nighthawks, Edward Hopper",
-    src: `${IIIF}/831a05de-d3f6-f4fa-a460-23008dd58dda/full/${SRC_WIDTH},/0/default.jpg`,
-    highResSrc: `${IIIF}/831a05de-d3f6-f4fa-a460-23008dd58dda/full/${HIGH_RES_WIDTH},/0/default.jpg`,
-  },
+  metItem("436535", "ep", "DP-42549-001.jpg", "Wheat Field with Cypresses", "Vincent van Gogh", "1889"),
+  metItem("11417", "ad", "DP215410.jpg", "Washington Crossing the Delaware", "Emanuel Leutze", "1851"),
+  metItem("436105", "ep", "DP-13139-001.jpg", "The Death of Socrates", "Jacques Louis David", "1787"),
+  metItem("437329", "ep", "DP-29324-001.jpg", "The Abduction of the Sabine Women", "Nicolas Poussin", "1633–34"),
+  metItem("435809", "ep", "DP119115.jpg", "The Harvesters", "Pieter Bruegel the Elder", "1565"),
+  metItem("436947", "ep", "DP-25466-001.jpg", "Boating", "Édouard Manet", "1874"),
+  metItem("437654", "ep", "DP375450_cropped.jpg", "Circus Sideshow", "Georges Seurat", "1887–88"),
+  metItem("438814", "ep", "DP-14344-001.jpg", "The Abduction of Rebecca", "Eugène Delacroix", "1846"),
+  metItem("435882", "ep", "DT47.jpg", "Still Life with Apples and a Pot of Primroses", "Paul Cézanne", "ca. 1890"),
+  metItem("436532", "ep", "DT1502_cropped2.jpg", "Self-Portrait with a Straw Hat", "Vincent van Gogh", "1887"),
+  metItem("436573", "ep", "DP-17777-001.jpg", "Cardinal Fernando Niño de Guevara", "El Greco", "ca. 1600"),
+  metItem("437853", "ep", "DP169568.jpg", "Venice, from the Porch of Madonna della Salute", "J. M. W. Turner", "ca. 1835"),
 ];
 
 function shuffle(arr) {
@@ -107,12 +115,22 @@ function imageUrl(iiif, imageId, width) {
 // metadata alone isn't enough — we verify the real URL before showing it. Uses
 // `Image()` (not `fetch`, which AIC's IIIF doesn't send CORS headers for); the
 // load is reused from cache when the panel renders. Resolves true/false.
-function probeImage(src) {
+function probeImage(src, timeoutMs = 8000) {
   return new Promise((resolve) => {
     if (!src) return resolve(false);
     const img = new Image();
-    img.onload = () => resolve(img.naturalWidth > 0);
-    img.onerror = () => resolve(false);
+    let settled = false;
+    const finish = (ok) => {
+      if (settled) return;
+      settled = true;
+      clearTimeout(timer);
+      resolve(ok);
+    };
+    // A hung request (Cloudflare challenge that never resolves, slow network)
+    // must not stall the whole batch — cap the wait and treat it as a miss.
+    const timer = setTimeout(() => finish(false), timeoutMs);
+    img.onload = () => finish(img.naturalWidth > 0);
+    img.onerror = () => finish(false);
     img.src = src;
   });
 }
@@ -204,12 +222,28 @@ export async function fetchRandomProjects(count = 6, opts = {}) {
       candidates.push(toItem(o, iiif));
     }
 
-    // Metadata can promise an image the IIIF server withholds (403), so keep only
-    // the first `count` candidates whose images actually load.
+    // Metadata can promise an image the IIIF server withholds (403 — now often a
+    // Cloudflare bot challenge), so keep only the candidates whose images load.
     const items = await takeLoadable(candidates, count);
-    if (items.length) return items;
+    // A full set is ideal; when the term was thin or many images were blocked,
+    // top up from the reliable Met fallback so the slider is consistently full.
+    if (items.length >= count) return items;
+    return padFromFallback(items, count);
   } catch {
     // fall through to the offline fallback
   }
   return FALLBACK_ITEMS.slice(0, count);
+}
+
+// Append fallback items (deduped by id) to a short live set until it reaches
+// `count`. The Met fallback ids are namespaced (`met-…`) so they never collide
+// with AIC's numeric ids.
+function padFromFallback(items, count) {
+  const seen = new Set(items.map((i) => i.id));
+  const out = items.slice();
+  for (const f of FALLBACK_ITEMS) {
+    if (out.length >= count) break;
+    if (!seen.has(f.id)) out.push(f);
+  }
+  return out;
 }

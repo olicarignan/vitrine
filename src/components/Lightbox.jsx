@@ -102,6 +102,12 @@ export function Lightbox({
   const [activeIndex, setActiveIndex] = useState(initialIndex);
   const [, setIsDragging] = useState(false);
   const dragDistRef = useRef(0);
+  // Pointer type of the in-flight gesture, so a touch tap can be told apart from
+  // a mouse click (touch taps on a video reveal its controls instead of closing).
+  const lastPointerTypeRef = useRef("mouse");
+  // Touch only: whether the active video's controls are revealed. Toggled by a
+  // tap on the video; reset whenever the active item changes.
+  const [videoControlsShown, setVideoControlsShown] = useState(false);
   // Tracks a possible touch drag-down-to-dismiss gesture (null when idle).
   const dismissRef = useRef(null);
   // While a dismiss drag is active we switch the track to overflow:visible so the
@@ -395,6 +401,7 @@ export function Lightbox({
   // Desktop drag handling (mouse). Touch horizontal panning is native
   // (touch-action: pan-x); a touch *down*-drag is captured here to dismiss.
   const handlePointerDown = useCallback((e) => {
+    lastPointerTypeRef.current = e.pointerType;
     if (e.pointerType === "touch") {
       // Cancel any pending restore so a quick re-drag keeps the frozen position.
       clearTimeout(restoreTimerRef.current);
@@ -638,6 +645,12 @@ export function Lightbox({
     [activeIndex, onClose, scrollToIndex, copies, n, beginSmooth],
   );
 
+  // Collapse any revealed video controls when the active item changes (e.g. the
+  // user scrolls to the next clip) — the reveal is per-video.
+  useEffect(() => {
+    setVideoControlsShown(false);
+  }, [activeIndex]);
+
   // Video autoplay — real items only (clones never render a <video>).
   useEffect(() => {
     const track = trackRef.current;
@@ -677,8 +690,18 @@ export function Lightbox({
     (pos) => {
       if (dragDistRef.current >= 5) return;
       const activePos = copies ? copies * n + activeIndex : activeIndex;
-      if (pos === activePos) onClose();
-      else if (copies) {
+      if (pos === activePos) {
+        // Touch: tapping the active *video* reveals its controls rather than
+        // dismissing — on mobile the lightbox only closes via the drag-down
+        // gesture, the backdrop, or the lightbox chrome. Images (and pointer
+        // devices, which reveal controls on hover) close on tap as before.
+        const isVideo = videoControls && Boolean(items[activeIndex]?.video);
+        if (isVideo && lastPointerTypeRef.current === "touch") {
+          setVideoControlsShown((v) => !v);
+          return;
+        }
+        onClose();
+      } else if (copies) {
         const el = trackRef.current?.querySelectorAll(".lightbox__item")[pos];
         if (el) {
           beginSmooth();
@@ -690,7 +713,7 @@ export function Lightbox({
         }
       } else scrollToIndex(pos);
     },
-    [activeIndex, onClose, scrollToIndex, copies, n, beginSmooth],
+    [activeIndex, onClose, scrollToIndex, copies, n, beginSmooth, items, videoControls],
   );
 
   return (
@@ -744,6 +767,7 @@ export function Lightbox({
               staggerDone={staggerDone}
               transitionName={transitionName}
               videoControls={videoControls}
+              showControls={videoControlsShown}
               onClick={handleItemClick}
             />
           );
@@ -794,6 +818,7 @@ function LightboxItem({
   staggerDone,
   transitionName,
   videoControls,
+  showControls = false,
   onClick,
 }) {
   const hasHighRes = Boolean(item.highResSrc);
@@ -808,7 +833,9 @@ function LightboxItem({
 
   return (
     <div
-      className={`lightbox__item${isActive ? " lightbox__item--active" : ""}`}
+      className={`lightbox__item${isActive ? " lightbox__item--active" : ""}${
+        isActive && showControls ? " lightbox__item--show-controls" : ""
+      }`}
       data-index={index}
       data-clone={clone ? "" : undefined}
       aria-hidden={clone ? true : undefined}

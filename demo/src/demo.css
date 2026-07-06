@@ -545,6 +545,10 @@ ul {
   position: absolute;
   top: 0.8rem;
   right: 0.8rem;
+  /* Opaque surface matching the code block (the translucent surface over --bg),
+     so code scrolled horizontally behind the button is masked instead of
+     showing through and overlapping the icon on narrow screens. */
+  background: color-mix(in srgb, var(--color-black) 4%, var(--bg));
 }
 
 .credits {
