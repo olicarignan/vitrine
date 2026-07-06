@@ -3,7 +3,7 @@
 // No key-less art-museum API serves playable video, so the video slider draws
 // from Pexels instead: a large library of free, no-attribution-required stock
 // clips served as CORS-open MP4 (which — unlike Wikimedia's webm/ogv — autoplays
-// on Safari/iOS too). We search a random art-leaning term each load, pick a
+// on Safari/iOS too). We search a random abstract/motion term each load, pick a
 // sensibly-sized rendition, and map results into the flat item shape the slider
 // expects, using the poster `image` as `src` and the MP4 as the looping `video`.
 //
@@ -26,18 +26,18 @@ const ENV_KEY =
 // six looping panels stay light while still looking crisp.
 const TARGET_WIDTH = 1280;
 
-// Art-leaning search terms; a fresh random one each load keeps the set varied.
+// Abstract/motion search terms; a fresh random one each load keeps the set varied.
 const QUERY_TERMS = [
-  "art gallery",
-  "oil painting",
-  "painter painting",
-  "art studio",
-  "sculptor sculpting",
-  "pottery wheel",
-  "watercolor painting",
-  "museum art",
-  "graffiti mural artist",
-  "ink calligraphy",
+  "ink in water",
+  "fluid art",
+  "abstract paint",
+  "liquid color",
+  "smoke motion",
+  "colorful abstract",
+  "paint mixing",
+  "light abstract",
+  "slow motion color",
+  "abstract texture",
 ];
 
 // "https://www.pexels.com/video/oil-painting-and-spatulas-7037886/"
@@ -80,7 +80,7 @@ function toItem(v) {
 }
 
 /**
- * Fetch `count` art-leaning stock videos from Pexels for the video slider.
+ * Fetch `count` abstract/motion stock videos from Pexels for the video slider.
  * Returns an empty array if no key is configured or the network is unavailable
  * (the caller then hides the video section).
  *

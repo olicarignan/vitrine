@@ -44,17 +44,6 @@ export default function Home() {
             <InstallTabs />
             <h3>Usage</h3>
             <CodeBlock code={USAGE} label="Copy usage snippet" />
-            <p className="install__link">
-              Browse the <Link to="/docs">documentation &amp; live demos</Link>,
-              or check the project on{" "}
-              <a
-                href="https://github.com/olicarignan/vitrine"
-                target="_blank"
-                rel="noopener noreferrer"
-              >
-                Github
-              </a>
-            </p>
           </section>
         </div>
       </div>

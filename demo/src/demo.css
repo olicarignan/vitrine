@@ -887,6 +887,28 @@ ul {
   margin-top: 4lh;
 }
 
+.footer__separator {
+  width: 100%;
+  height: 0;
+  margin: 0.6lh 0;
+  border: 0;
+  border-top: 1px solid currentColor;
+  opacity: 0.15;
+}
+
+.footer__meta {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  width: 100%;
+  gap: 0.5em;
+}
+
+.footer__meta .credit:last-child {
+  gap: 0.5em;
+  opacity: 0.6;
+}
+
 .docs__intro {
   grid-column: 1 / -1;
   margin-top: 1.5lh;

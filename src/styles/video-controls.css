@@ -141,6 +141,11 @@
   /* Blend the bar (track + fill) against the footage instead of a scrim, so it
      inverts to stay legible over any frame. */
   mix-blend-mode: difference;
+  /* Soften and desaturate the footage *before* the difference blend, so the
+     inverted look is preserved but the bar reads calmer over saturated frames.
+     (A plain `filter` runs after the blend and wouldn't touch the inversion.) */
+  backdrop-filter: saturate(0.6) blur(2px);
+  -webkit-backdrop-filter: saturate(0.6) blur(2px);
   /* Scrubbing must never pan the track or start a drag-down dismiss. */
   touch-action: none;
   transition: height 0.2s ease;
