@@ -1,7 +1,7 @@
 "use client";
 
 import { useRef } from "react";
-import { VideoControls } from "./VideoControls";
+import { VideoPlayToggle } from "./VideoPlayToggle";
 
 /**
  * The media block of a slider panel: responsive <picture> plus the optional
@@ -68,7 +68,7 @@ export function SliderItemMedia({
         />
       )}
       {showVideo && videoControls && isActive && (
-        <VideoControls videoRef={videoRef} />
+        <VideoPlayToggle videoRef={videoRef} size={40} />
       )}
     </>
   );

@@ -41,6 +41,9 @@ export const RowTrack = forwardRef(function RowTrack(
     metaOffsetColumns,
     sideMargin,
     maxItemHeight,
+    // Force a fixed cover-cropped box of this width/height ratio (number, w/h).
+    // null → natural height (row) or the coverflow default box.
+    aspectRatio,
     sizes,
     videoControls,
     itemsClickable,
@@ -61,6 +64,9 @@ export const RowTrack = forwardRef(function RowTrack(
     trackClassName,
     // Coverflow only: no videos in the track, posters only.
     video = true,
+    // Endless scroll: the array loops. Resolved by <Slider> (coverflow
+    // defaults on, row off).
+    loop = false,
   },
   ref,
 ) {
@@ -81,6 +87,24 @@ export const RowTrack = forwardRef(function RowTrack(
     centered: false,
   });
   const centered = mode === "coverflow";
+
+  /* Endless scroll (`loop`): whole sets of the items are cloned on both sides
+     of the real set. While scrolling, the position teleports by one set-span
+     whenever it drifts past the window around the real set — the sets are
+     pixel-identical, so the jump is invisible. Whenever scrolling settles the
+     position is normalized back onto the real set, so at rest the centered
+     element is always a real item and clicks, shared-element zooms, and
+     `park()` never target a clone. Two-plus sets per side give native (wheel)
+     scrolling runway between settles; small arrays get more. */
+  const n = items.length;
+  const copies = loop && n > 0 ? Math.max(2, Math.ceil(8 / n)) : 0;
+  const sets = 2 * copies + 1;
+  // True while a native smooth scroll (scrollIntoView) is in flight: the
+  // browser animates toward an absolute position, so teleporting the scroll
+  // under it would make it visibly rewind. Jumps wait; the settle normalizes.
+  const smoothRef = useRef(false);
+  const smoothTimer = useRef(null);
+  const idleTimer = useRef(null);
 
   useEffect(() => {
     const measure = () => {
@@ -111,10 +135,20 @@ export const RowTrack = forwardRef(function RowTrack(
           colLeft = (vw - colWidth) / 2;
           margin = isDesktop ? colLeft : sideMargin;
         }
-        const boxW = isDesktop
+        let boxW = isDesktop
           ? Math.round(Math.min(contentWidth * 0.62, vw - 2 * sideMargin))
           : vw - 2 * margin;
-        const boxH = isDesktop ? maxItemHeight : Math.round(boxW * 0.75);
+        // Coverflow always uses a fixed box. Default ≈ 3:4 (height =
+        // maxItemHeight on desktop); `aspectRatio` overrides it, shrinking the
+        // width for tall ratios so the box keeps the requested ratio exactly.
+        let boxH = isDesktop ? maxItemHeight : Math.round(boxW * 0.75);
+        if (aspectRatio) {
+          boxH = Math.round(boxW / aspectRatio);
+          if (boxH > maxItemHeight) {
+            boxH = maxItemHeight;
+            boxW = Math.round(boxH * aspectRatio);
+          }
+        }
         const pad = Math.max((vw - boxW) / 2, 0);
         setLayout({
           inset: pad,
@@ -148,10 +182,23 @@ export const RowTrack = forwardRef(function RowTrack(
         const oneCol = (colWidth - (cols - 1) * colGap) / cols;
         // 12px overhang each side so the active panel breathes past the column.
         const inset = colLeft - 12;
+        // Natural height by default; `aspectRatio` forces a cover-cropped box
+        // sized to the ratio, bounded by maxItemHeight (width shrinks to keep
+        // the ratio when the height would exceed it).
+        let boxW = colWidth + 24;
+        let boxH = 0;
+        if (aspectRatio) {
+          boxW = colWidth;
+          boxH = Math.round(boxW / aspectRatio);
+          if (boxH > maxItemHeight) {
+            boxH = maxItemHeight;
+            boxW = Math.round(boxH * aspectRatio);
+          }
+        }
         setLayout({
           inset,
-          itemWidth: colWidth + 24,
-          itemHeight: 0,
+          itemWidth: boxW,
+          itemHeight: boxH,
           // Caption aligns to the active panel's left edge, plus an optional indent.
           metaInset: inset + metaOffsetColumns * (oneCol + colGap),
           metaInsetRight: inset,
@@ -159,6 +206,7 @@ export const RowTrack = forwardRef(function RowTrack(
           endPad: vw - inset,
           isMobile: false,
           centered: false,
+          fixedAspect: Boolean(aspectRatio),
         });
       } else {
         // Mobile: the panel spans the full content width (viewport minus the grid's
@@ -171,15 +219,25 @@ export const RowTrack = forwardRef(function RowTrack(
         } else {
           margin = sideMargin;
         }
+        let boxW = vw - 2 * margin;
+        let boxH = 0;
+        if (aspectRatio) {
+          boxH = Math.round(boxW / aspectRatio);
+          if (boxH > maxItemHeight) {
+            boxH = maxItemHeight;
+            boxW = Math.round(boxH * aspectRatio);
+          }
+        }
         setLayout({
           inset: margin,
-          itemWidth: vw - 2 * margin,
-          itemHeight: 0,
+          itemWidth: boxW,
+          itemHeight: boxH,
           metaInset: margin,
           metaInsetRight: margin,
           endPad: margin,
           isMobile: true,
           centered: false,
+          fixedAspect: Boolean(aspectRatio),
         });
       }
     };
@@ -196,36 +254,111 @@ export const RowTrack = forwardRef(function RowTrack(
       window.removeEventListener("resize", onResize);
       clearTimeout(resizeTimer);
     };
-  }, [contentWidth, gap, columns, metaOffsetColumns, sideMargin, maxItemHeight, centered]);
+  }, [contentWidth, gap, columns, metaOffsetColumns, sideMargin, maxItemHeight, aspectRatio, centered]);
 
   // The meta caption (rendered by the orchestrator) aligns to this layout.
   useEffect(() => {
     onLayoutChange?.(layout);
   }, [layout, onLayoutChange]);
 
-  useEffect(() => {
-    const track = trackRef.current;
-    if (!track) return;
-    track.scrollLeft = 0;
-  }, [layout.inset]);
-
   // Centered modes (mobile, coverflow) snap items to the viewport center;
   // desktop row snaps their left edge to the content column.
   const snapInline = layout.centered || layout.isMobile ? "center" : "start";
+
+  // The scrollLeft that puts an element in the active slot.
+  const slotTargetFor = useCallback(
+    (track, el) =>
+      el.offsetLeft -
+      (snapInline === "center"
+        ? (track.clientWidth - el.offsetWidth) / 2
+        : layout.inset),
+    [snapInline, layout.inset],
+  );
+
+  useEffect(() => {
+    const track = trackRef.current;
+    if (!track) return;
+    if (!copies) {
+      track.scrollLeft = 0;
+      return;
+    }
+    // Loop: start on the real set (everything before it is clone runway).
+    const el = track.querySelectorAll(".slider__item")[copies * n];
+    if (el) track.scrollLeft = slotTargetFor(track, el);
+  }, [layout.inset, copies, n, slotTargetFor]);
+
+  const beginSmooth = useCallback(() => {
+    smoothRef.current = true;
+    clearTimeout(smoothTimer.current);
+    smoothTimer.current = setTimeout(() => {
+      smoothRef.current = false;
+    }, 800);
+  }, []);
+
+  // Instantly re-seat the scroll on the real set — the shift is a multiple of
+  // the set span, so the pixels don't change. Runs whenever scrolling settles.
+  const normalize = useCallback(() => {
+    const track = trackRef.current;
+    if (!track || !copies || dragState.current.isDragging) return;
+    const itemEls = track.querySelectorAll(".slider__item");
+    if (n === 0 || itemEls.length !== sets * n) return;
+    const span = itemEls[n].offsetLeft - itemEls[0].offsetLeft;
+    if (!span) return;
+    let closest = 0;
+    let closestDist = Infinity;
+    for (let i = 0; i < itemEls.length; i++) {
+      const d = Math.abs(slotTargetFor(track, itemEls[i]) - track.scrollLeft);
+      if (d < closestDist) {
+        closestDist = d;
+        closest = i;
+      }
+    }
+    const set = Math.floor(closest / n);
+    if (set !== copies) track.scrollLeft += (copies - set) * span;
+    smoothRef.current = false;
+  }, [copies, sets, n, slotTargetFor]);
+
+  useEffect(() => {
+    const track = trackRef.current;
+    if (!track || !copies) return;
+    const onEnd = () => normalize();
+    track.addEventListener("scrollend", onEnd);
+    return () => track.removeEventListener("scrollend", onEnd);
+  }, [copies, normalize]);
 
   const scrollToIndex = useCallback(
     (index) => {
       const track = trackRef.current;
       if (!track || !layout.itemWidth) return;
       const itemEls = track.querySelectorAll(".slider__item");
-      if (!itemEls[index]) return;
-      itemEls[index].scrollIntoView({
+      let el;
+      if (copies) {
+        // Loop: several copies of the target exist — travel to the nearest
+        // one, so wrapping forward from the last item reaches the adjacent
+        // clone of the first instead of rewinding a whole set.
+        const real = ((index % n) + n) % n;
+        let bestDist = Infinity;
+        for (let s = 0; s < sets; s++) {
+          const cand = itemEls[s * n + real];
+          if (!cand) continue;
+          const d = Math.abs(slotTargetFor(track, cand) - track.scrollLeft);
+          if (d < bestDist) {
+            bestDist = d;
+            el = cand;
+          }
+        }
+        if (el) beginSmooth();
+      } else {
+        el = itemEls[index];
+      }
+      if (!el) return;
+      el.scrollIntoView({
         behavior: "smooth",
         block: "nearest",
         inline: snapInline,
       });
     },
-    [layout.itemWidth, snapInline],
+    [layout.itemWidth, snapInline, copies, sets, n, slotTargetFor, beginSmooth],
   );
 
   const goTo = useCallback(
@@ -317,8 +450,47 @@ export const RowTrack = forwardRef(function RowTrack(
     const track = trackRef.current;
     if (!track) return;
 
-    // Skip detection when scroll was triggered by lightbox sync
-    if (externalScroll.current) return;
+    if (copies) {
+      // Loop: teleport by one set-span when the scroll drifts past the window
+      // around the real set — same pixels, so invisible. Never under a native
+      // smooth scroll (the browser animates toward an absolute position and
+      // would visibly rewind); those re-seat on settle instead.
+      if (!smoothRef.current) {
+        const els = track.querySelectorAll(".slider__item");
+        if (n > 0 && els.length === sets * n) {
+          const span = els[n].offsetLeft - els[0].offsetLeft;
+          const home = slotTargetFor(track, els[copies * n]);
+          const s = track.scrollLeft;
+          let shift = 0;
+          // The window spans the whole real set (scroll ∈ [home, home+span])
+          // padded by ¾ span each side, so normalize()'s re-seat — anywhere
+          // within the real set — never lands on a boundary and the two can't
+          // ping-pong. A one-span jump from either edge lands back inside.
+          if (span && s < home - span * 0.75) shift = span;
+          else if (span && s > home + span * 1.75) shift = -span;
+          if (shift) {
+            track.scrollLeft = s + shift;
+            // Keep an in-flight drag's absolute base in the same frame.
+            if (dragState.current.isDragging)
+              dragState.current.scrollLeft += shift;
+          }
+        }
+      }
+      // Settle fallback for browsers without `scrollend`.
+      clearTimeout(idleTimer.current);
+      idleTimer.current = setTimeout(normalize, 200);
+    }
+
+    // Note on `externalScroll` (lightbox sync): only the active-index
+    // *detection* is suppressed, so the slider and lightbox don't fight over
+    // the index. The per-frame visual writers (coverflow projection, mobile
+    // depth scales) must keep running — an externally driven scroll moves the
+    // panels all the same, and skipping them leaves stale transforms behind:
+    // the lightbox would close onto a centered panel still wearing its
+    // off-center rotation.
+
+    // Positional index (over clones + real) → item index.
+    const toReal = (p) => (copies ? p % n : p);
 
     if (layout.centered) {
       if (scrollRafTicking.current) return;
@@ -327,7 +499,9 @@ export const RowTrack = forwardRef(function RowTrack(
         scrollRafTicking.current = false;
         const t = trackRef.current;
         if (!t) return;
-        onActiveIndexChange(updateProjection(t));
+        const closest = updateProjection(t);
+        if (externalScroll.current) return;
+        onActiveIndexChange(toReal(closest));
         clearTimeout(scrollTimer.current);
       });
       return;
@@ -341,11 +515,15 @@ export const RowTrack = forwardRef(function RowTrack(
         const t = trackRef.current;
         if (!t) return;
         const closest = updateMobileScales(t);
-        onActiveIndexChange(closest);
+        if (externalScroll.current) return;
+        onActiveIndexChange(toReal(closest));
         clearTimeout(scrollTimer.current);
       });
       return;
     }
+
+    // Skip detection when scroll was triggered by lightbox sync
+    if (externalScroll.current) return;
 
     // Desktop: panels snap start-aligned to the slot's left edge, so the active
     // panel is the one whose left edge is nearest that edge. (Overlap-based
@@ -372,9 +550,21 @@ export const RowTrack = forwardRef(function RowTrack(
         }
       });
 
-      onActiveIndexChange(bestIndex);
+      onActiveIndexChange(toReal(bestIndex));
     });
-  }, [layout.inset, layout.isMobile, updateMobileScales, onActiveIndexChange]);
+  }, [
+    layout.inset,
+    layout.centered,
+    layout.isMobile,
+    updateMobileScales,
+    updateProjection,
+    onActiveIndexChange,
+    copies,
+    sets,
+    n,
+    slotTargetFor,
+    normalize,
+  ]);
 
   useEffect(() => {
     const track = trackRef.current;
@@ -400,27 +590,56 @@ export const RowTrack = forwardRef(function RowTrack(
     }
   }, [layout.centered, layout.isMobile, updateMobileScales, updateProjection]);
 
+  // `pos` is the element's position across clones + real set.
   const handleItemClick = useCallback(
-    (index) => {
-      if (index === activeIndex) {
-        onItemOpen?.(index);
+    (pos) => {
+      const real = copies ? pos % n : pos;
+      const activePos = copies ? copies * n + activeIndex : activeIndex;
+      if (pos === activePos) {
+        onItemOpen?.(real);
         return;
       }
       // Non-active item: scroll it into the active position first, then open it
       // once the scroll animation finishes — so the lightbox opens already in
       // sync with the slider. Without a lightbox, centering is the interaction.
       const track = trackRef.current;
-      scrollToIndex(index);
+      if (copies) {
+        // Scroll the clicked element itself into the slot (it may be a clone).
+        const el = track?.querySelectorAll(".slider__item")[pos];
+        if (el) {
+          beginSmooth();
+          el.scrollIntoView({
+            behavior: "smooth",
+            block: "nearest",
+            inline: snapInline,
+          });
+        }
+      } else {
+        scrollToIndex(pos);
+      }
       if (!openOnSettle) return;
       const open = () => {
         clearTimeout(fallback);
         track?.removeEventListener("scrollend", open);
-        onItemOpen?.(index);
+        // Re-seat on the real set first, so the shared-element zoom targets
+        // the real element, not an identical clone.
+        normalize();
+        onItemOpen?.(real);
       };
       const fallback = setTimeout(open, 600);
       track?.addEventListener("scrollend", open, { once: true });
     },
-    [activeIndex, onItemOpen, openOnSettle, scrollToIndex],
+    [
+      activeIndex,
+      onItemOpen,
+      openOnSettle,
+      scrollToIndex,
+      copies,
+      n,
+      snapInline,
+      beginSmooth,
+      normalize,
+    ],
   );
 
   const handlePointerDown = useCallback((e) => {
@@ -515,6 +734,8 @@ export const RowTrack = forwardRef(function RowTrack(
           };
           const fallback = setTimeout(onScrollEnd, 300);
           track.addEventListener("scrollend", onScrollEnd, { once: true });
+          // The final snap may land on a clone; the settle normalizes it away.
+          if (copies) beginSmooth();
           itemEls[closest].scrollIntoView({
             behavior: "smooth",
             block: "nearest",
@@ -525,7 +746,7 @@ export const RowTrack = forwardRef(function RowTrack(
 
       requestAnimationFrame(step);
     },
-    [layout.inset, snapInline, handleItemClick],
+    [layout.inset, snapInline, handleItemClick, copies, beginSmooth],
   );
 
   useImperativeHandle(
@@ -534,7 +755,10 @@ export const RowTrack = forwardRef(function RowTrack(
       goTo,
       park: (index) => {
         const track = trackRef.current;
-        const el = track?.querySelectorAll(".slider__item")[index];
+        // Always the real element — the view transition's name lives on it.
+        const el = track?.querySelectorAll(
+          ".slider__item:not([data-clone])",
+        )[index];
         if (!track || !el) {
           return { apply: () => {}, release: () => {} };
         }
@@ -545,6 +769,8 @@ export const RowTrack = forwardRef(function RowTrack(
         // against sub-pixel loops) so there's no visible bounce.
         const parkInline = snapInline;
         const apply = () => {
+          // Loop: re-seat on the real set (pixel-identical) before measuring.
+          normalize();
           const rect = el.getBoundingClientRect();
           const target =
             parkInline === "center" ? window.innerWidth / 2 : layout.inset;
@@ -563,14 +789,19 @@ export const RowTrack = forwardRef(function RowTrack(
           release: () => track.removeEventListener("scroll", apply),
         };
       },
-      getItemEls: () => trackRef.current?.querySelectorAll(".slider__item") ?? [],
+      getItemEls: () =>
+        trackRef.current?.querySelectorAll(
+          ".slider__item:not([data-clone])",
+        ) ?? [],
     }),
-    [goTo, snapInline, layout.inset],
+    [goTo, snapInline, layout.inset, normalize],
   );
 
   return (
     <motion.div
-      className={`slider__track${trackClassName ? ` ${trackClassName}` : ""}`}
+      className={`slider__track${trackClassName ? ` ${trackClassName}` : ""}${
+        layout.fixedAspect ? " slider__track--fixed" : ""
+      }`}
       ref={trackRef}
       tabIndex={-1}
       onPointerDown={handlePointerDown}
@@ -587,16 +818,25 @@ export const RowTrack = forwardRef(function RowTrack(
         touchAction: "pan-x pan-y",
       }}
     >
-      {items.map((item, i) => {
-        const itemKey = item.id ?? i;
+      {Array.from({ length: sets * n }, (_, pos) => {
+        const i = pos % n;
+        const item = items[i];
+        // Clones only exist when looping; the real set sits in the middle.
+        const clone = copies > 0 && Math.floor(pos / n) !== copies;
+        const isActive = !clone && i === activeIndex;
+        const interactive = !clone && itemsClickable;
         return (
           <motion.div
-            key={itemKey}
-            className={`slider__item${i === activeIndex ? " slider__item--active" : ""}`}
-            variants={itemFadeIn}
-            role={itemsClickable ? "button" : undefined}
-            tabIndex={itemsClickable ? 0 : undefined}
-            aria-label={itemsClickable ? item.title : undefined}
+            key={`${Math.floor(pos / n)}:${item.id ?? i}`}
+            data-clone={clone ? "" : undefined}
+            className={`slider__item${isActive ? " slider__item--active" : ""}`}
+            // Clones skip the mount stagger (they'd push the real items' fade
+            // far down the stagger order) and stay out of the a11y tree.
+            variants={clone ? undefined : itemFadeIn}
+            role={interactive ? "button" : undefined}
+            tabIndex={interactive ? 0 : undefined}
+            aria-label={interactive ? item.title : undefined}
+            aria-hidden={clone ? true : undefined}
             style={{
               "--item-max-w": `${layout.itemWidth}px`,
               "--item-max-h": `${layout.itemHeight || maxItemHeight}px`,
@@ -604,14 +844,14 @@ export const RowTrack = forwardRef(function RowTrack(
             }}
             onClick={() => {
               // Touch clicks (pointer capture doesn't apply to touch)
-              if (dragDistRef.current < 5) handleItemClick(i);
+              if (dragDistRef.current < 5) handleItemClick(pos);
             }}
             onKeyDown={
-              itemsClickable
+              interactive
                 ? (e) => {
                     if (e.key === "Enter" || e.key === " ") {
                       e.preventDefault();
-                      handleItemClick(i);
+                      handleItemClick(pos);
                     }
                   }
                 : undefined
@@ -622,9 +862,10 @@ export const RowTrack = forwardRef(function RowTrack(
                 item={item}
                 index={i}
                 sizes={sizes}
-                video={video}
+                // No <video> on clones — one autoplaying element per item.
+                video={video && !clone}
                 videoControls={videoControls}
-                isActive={i === activeIndex}
+                isActive={isActive}
               />
             </div>
           </motion.div>

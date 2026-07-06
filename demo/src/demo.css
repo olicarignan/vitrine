@@ -235,6 +235,12 @@ ul {
   padding-top: 0.5em;
 }
 
+.docs-link {
+  text-decoration: underline;
+  color: var(--color-black);
+  font-size: 1.6rem;
+}
+
 /* Visually hidden, but still announced by screen readers. */
 .sr-only {
   position: absolute;
@@ -357,7 +363,7 @@ ul {
   }
 
   h3 {
-    margin-top: 1lh;
+    margin-top: 4lh;
     color: var(--color-black);
   }
 
@@ -509,6 +515,7 @@ ul {
   padding: 1.6rem 2rem;
   border-radius: 12px;
   background: color-mix(in srgb, var(--color-black) 4%, transparent);
+  border: 1px solid color-mix(in srgb, var(--color-black) 10%, transparent);
   overflow-x: auto;
 
   code {
@@ -516,6 +523,11 @@ ul {
     line-height: 1.6;
     white-space: pre;
   }
+}
+
+/* Comments render paler than the code they annotate. */
+.usage__comment {
+  color: var(--color-grey);
 }
 
 /* Usage snippet — anchors the copy button to the top-right of the code block. */
@@ -547,7 +559,8 @@ ul {
 .credit {
   display: flex;
   align-items: center;
-  gap: 0.4rem;
+  /* One space's worth before the link, matching the icon's trailing gap. */
+  gap: 0.25em;
 }
 
 .icon-link {
@@ -600,7 +613,7 @@ ul {
 @media (hover: hover) and (pointer: fine) {
   .icon-link:hover .icon-link__icon {
     width: 0.75em;
-    margin-right: 0.6rem;
+    margin-right: 0.25em;
   }
 
   .icon-link:hover .icon-link__icon svg {
@@ -613,7 +626,7 @@ ul {
 @media not all and (hover: hover) {
   .icon-link__icon {
     width: 0.75em;
-    margin-right: 0.6rem;
+    margin-right: 0.25em;
   }
 
   .icon-link__icon svg {
@@ -629,35 +642,249 @@ ul {
   color: inherit;
 }
 
-.docs__crumb {
-  color: var(--color-grey);
-  font-weight: 375;
+/* Sectioned page nav. Narrow viewports: in the flow under the header, the two
+   groups as labeled wrap rows (same quiet link language as the install tabs).
+   Wide viewports: a fixed strip in the left gutter over which the full-bleed
+   slider panels slide, veiled by a progressive blur — full page-background at
+   the screen edge, fading to transparent toward the content. (Below the
+   lightbox's z-index: 100 so the zoom still covers it.) */
+.docs__sidebar {
+  /* Mobile collapses the nav into the hamburger overlay; the in-column strip
+     is desktop-only (shown by the >=1160px block below). */
+  display: none;
 }
 
-/* Page nav — same quiet tab language as the install tabs. */
-.docs__nav {
+.docs__sidebar-label {
+  font-size: 1.4rem;
+  font-weight: 475;
+  letter-spacing: -0.01em;
+  color: var(--color-black);
+  margin-bottom: 0.4rem;
+}
+
+.docs__sidebar-group ul {
+  list-style: none;
+  margin: 0;
+  padding: 0;
   display: flex;
   flex-wrap: wrap;
   gap: 0.4rem 1.6rem;
-  margin-top: 0.75lh;
 }
 
-.docs__nav a {
+.docs__navlink {
+  display: inline-block;
   font-size: 1.4rem;
   font-weight: 375;
   letter-spacing: -0.01em;
-  padding: 0.4rem 0;
+  padding: 0.2rem 0;
   color: var(--color-grey);
   transition: color 0.2s ease;
 }
 
-.docs__nav a:hover {
+.docs__navlink:hover {
   color: var(--color-black);
 }
 
-.docs__nav a.active {
+.docs__navlink.active {
   color: var(--color-black);
   font-weight: 475;
+}
+
+/* Grid max-width ≈ 708px + ~210px of sidebar on each side. */
+@media (min-width: 1160px) {
+  .docs__sidebar {
+    position: fixed;
+    top: 0;
+    left: 0;
+    /* Above the sliders (their variant tracks isolate the panels' internal
+       z-indexes), below the lightbox's z-index: 100. */
+    z-index: 50;
+    height: 100dvh;
+    width: 21rem;
+    margin-top: 0;
+    /* Top padding matches .page's clamp so the first label lines up with the
+       page title. */
+    padding: clamp(3.2rem, 6vw, 9.6rem) 3.2rem 3.2rem;
+    display: block;
+    overflow-y: auto;
+    /* The tint half of the veil: full page background at the screen edge,
+       dissolving to nothing before the content column. */
+    background: linear-gradient(
+      to right,
+      var(--bg) 0%,
+      color-mix(in srgb, var(--bg) 80%, transparent) 55%,
+      transparent 100%
+    );
+  }
+
+  /* The blur half. backdrop-filter is uniform per layer, so the progression
+     is faked with two masked layers: a strong blur hugging the screen edge
+     and a soft one reaching further right, each feathered out by its mask. */
+  .docs__sidebar::before,
+  .docs__sidebar::after {
+    content: "";
+    position: absolute;
+    inset: 0;
+    z-index: -1;
+    pointer-events: none;
+  }
+
+  .docs__sidebar::before {
+    -webkit-backdrop-filter: blur(24px);
+    backdrop-filter: blur(24px);
+    -webkit-mask-image: linear-gradient(to right, black 25%, transparent 65%);
+    mask-image: linear-gradient(to right, black 25%, transparent 65%);
+  }
+
+  .docs__sidebar::after {
+    -webkit-backdrop-filter: blur(6px);
+    backdrop-filter: blur(6px);
+    -webkit-mask-image: linear-gradient(to right, black 45%, transparent 95%);
+    mask-image: linear-gradient(to right, black 45%, transparent 95%);
+  }
+
+  .docs__sidebar-group + .docs__sidebar-group {
+    margin-top: 1.5lh;
+  }
+
+  .docs__sidebar-group ul {
+    display: block;
+  }
+
+  .docs__sidebar-group li + li {
+    margin-top: 0.2rem;
+  }
+}
+
+/* Hamburger toggle — mobile only; the desktop nav lives in the left gutter. */
+.docs__menu-toggle {
+  /* Pinned to the same viewport corner as the close button (.docs__menu-close),
+     same 4rem box, so the hamburger and the X line up exactly. */
+  position: fixed;
+  top: clamp(2rem, 5vw, 3.2rem);
+  right: clamp(2rem, 5vw, 3.2rem);
+  z-index: 60;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 4rem;
+  height: 4rem;
+  padding: 0;
+  border: none;
+  background: none;
+  color: var(--color-black);
+  cursor: pointer;
+}
+
+@media (min-width: 1160px) {
+  .docs__menu-toggle {
+    display: none;
+  }
+}
+
+/* Full-screen overlay menu, reusing the lightbox backdrop's scrim + blur. The
+   veil fades in first, then the labels + links stagger in over it. */
+.docs__menu {
+  position: fixed;
+  inset: 0;
+  z-index: 90;
+  display: flex;
+  align-items: center;
+  justify-content: flex-start;
+  /* Blurred scrim on the menu root so its backdrop-filter samples the page
+     behind the overlay; it ramps up (veil) before the items stagger in. */
+  background-color: rgba(0, 0, 0, 0.1);
+  -webkit-backdrop-filter: blur(20px);
+  backdrop-filter: blur(20px);
+  animation: docs-menu-veil 0.3s ease backwards;
+}
+
+/* Fade the blurred veil in first (blur + scrim ramp up). */
+@keyframes docs-menu-veil {
+  from {
+    background-color: rgba(0, 0, 0, 0);
+    -webkit-backdrop-filter: blur(0);
+    backdrop-filter: blur(0);
+  }
+}
+
+@keyframes docs-menu-fade {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes docs-menu-item {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+/* Transparent full-area layer just for click-to-close. */
+.docs__menu-backdrop {
+  position: absolute;
+  inset: 0;
+}
+
+/* No stacking context here (no z-index / opacity), so the blended links below
+   composite against the backdrop's blurred page. Positioned only so it paints
+   above the backdrop. */
+.docs__menu-nav {
+  position: relative;
+  margin-block: auto;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 2.4rem;
+  padding: 0 clamp(3.2rem, 8vw, 8rem);
+  text-align: left;
+}
+
+.docs__menu-nav .docs__sidebar-group ul {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 0.2rem;
+}
+
+/* Same colours and typesetting as the desktop sidebar (labels + links inherit
+   the base .docs__sidebar-label / .docs__navlink rules); only the entrance
+   stagger is added here. */
+.docs__menu-nav .docs__sidebar-label,
+.docs__menu-nav .docs__navlink {
+  animation: docs-menu-item 0.3s ease backwards;
+  /* Start after the veil, then cascade top to bottom. */
+  animation-delay: calc(0.18s + var(--stagger, 0) * 0.05s);
+}
+
+.docs__menu-close {
+  position: absolute;
+  top: clamp(2rem, 5vw, 3.2rem);
+  right: clamp(2rem, 5vw, 3.2rem);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 4rem;
+  height: 4rem;
+  padding: 0;
+  border: none;
+  background: none;
+  color: var(--color-black);
+  cursor: pointer;
+  animation: docs-menu-fade 0.3s ease backwards;
+}
+
+/* Shared page footer (Home + docs). */
+.page__footer {
+  margin-top: 4lh;
 }
 
 .docs__intro {
@@ -671,10 +898,66 @@ ul {
 }
 
 .docs__intro code,
-.docs__block code {
+.docs__block code,
+.docs__example-desc code {
   font-family: var(--font-mono);
   font-size: 0.85em;
   color: var(--color-black);
+}
+
+/* Inline code in prose (and the prop-reference table) gets the same background
+   + border as the code blocks. */
+.docs__intro :is(p, li) code,
+.docs__block :is(p, li) code,
+.docs__example-desc code,
+.props-table code {
+  padding: 0.15em 0.4em;
+  border-radius: 5px;
+  background: color-mix(in srgb, var(--color-black) 4%, transparent);
+  border: 1px solid color-mix(in srgb, var(--color-black) 10%, transparent);
+}
+
+/* Roomier reading rhythm across the docs prose. */
+.docs__intro p,
+.docs__block p,
+.docs__block li,
+.docs__example-desc {
+  line-height: 1.6;
+}
+
+/* Left-aligned title + description above a docs example. Uses the site's
+   single font size; the description carries the 16px gap down to the slider. */
+.docs__example-title {
+  grid-column: 1 / -1;
+  margin-bottom: 0.3rem;
+  font-weight: 450;
+  letter-spacing: -0.0225em;
+  color: var(--color-black);
+}
+
+.docs__example-desc {
+  grid-column: 1 / -1;
+  margin-bottom: 1.6rem;
+  max-width: 52ch;
+  font-weight: 400;
+  letter-spacing: -0.0175em;
+  color: var(--text-color);
+}
+
+/* First title (after the intro) needs its own top gap; later ones ride the
+   previous slider's bottom margin. The labelled slider/skeleton hugs the title. */
+.docs__example-heading {
+  margin-top: 2.4lh;
+}
+
+.slider + .docs__example-heading,
+.grid:has(.slider-skeleton) + .docs__example-heading {
+  margin-top: 0;
+}
+
+.docs__example-heading + .slider,
+.docs__example-heading + .grid .slider-skeleton {
+  margin-top: 0;
 }
 
 /* The sliders own their large block margins; the code/table block below the
@@ -687,6 +970,12 @@ ul {
   }
 }
 
+/* Pages without a slider between the intro and the block (Getting started,
+   API): cancel the slider-margin compensation. */
+.grid:has(.docs__intro) + .grid .docs__block {
+  margin-top: 1lh;
+}
+
 /* Prop-reference table */
 .props-table {
   margin-top: 0.5lh;
@@ -697,7 +986,7 @@ ul {
   width: 100%;
   border-collapse: collapse;
   font-size: 1.4rem;
-  line-height: 1.5;
+  line-height: 1.6;
 }
 
 .props-table th {
@@ -709,7 +998,8 @@ ul {
 .props-table th,
 .props-table td {
   padding: 0.8rem 2.4rem 0.8rem 0;
-  border-bottom: 1px solid color-mix(in srgb, var(--color-black) 10%, transparent);
+  border-bottom: 1px solid
+    color-mix(in srgb, var(--color-black) 10%, transparent);
   vertical-align: top;
 }
 

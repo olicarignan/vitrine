@@ -4,14 +4,27 @@
  * measuring the page's subgrid for alignment.
  */
 
-export function DocsIntro({ title, children }) {
+export function DocsIntro({ children }) {
+  // The page name lives in the docs header's subtitle; the intro is just the
+  // lead paragraph.
   return (
     <div className="grid">
       <div className="subgrid">
         <header className="docs__intro">
-          <h2>{title}</h2>
           <p>{children}</p>
         </header>
+      </div>
+    </div>
+  );
+}
+
+/** Left-aligned title + short description sitting directly above an example. */
+export function DocsExampleHeading({ title, children }) {
+  return (
+    <div className="grid docs__example-heading">
+      <div className="subgrid">
+        <h3 className="docs__example-title">{title}</h3>
+        {children ? <p className="docs__example-desc">{children}</p> : null}
       </div>
     </div>
   );

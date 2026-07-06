@@ -12,12 +12,19 @@ import { IconMorph } from "metamorphosis/react";
 function resolveIcon(target, lightboxOpen, itemsClickable) {
   if (!target || typeof target.closest !== "function") return null;
 
-  // The video control bar keeps the native cursor — a morphing glyph over a
-  // scrubber reads as noise, and the controls aren't a zoom/close surface.
-  if (target.closest(".vitrine-video-controls")) return null;
+  // Video controls keep the native cursor — a morphing glyph over the
+  // play/pause toggle or the lightbox scrubber reads as noise, and they aren't
+  // a zoom/close surface.
+  if (target.closest(".vitrine-video-toggle, .vitrine-lb-video")) return null;
 
   if (!lightboxOpen) {
-    return itemsClickable && target.closest(".slider__item") ? "plus" : null;
+    // Only over the morph-enabled slider's own items. Other sliders sharing the
+    // page keep their native zoom cursor, so the follower doesn't render its
+    // glyph stacked on top of theirs.
+    const item = target.closest(".slider__item");
+    return itemsClickable && item?.closest(".slider--morph-cursor")
+      ? "plus"
+      : null;
   }
 
   // The centered item and the overlay (backdrop / empty track runway) both

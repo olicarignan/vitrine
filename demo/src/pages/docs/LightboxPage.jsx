@@ -1,54 +1,55 @@
-import { useState } from "react";
 import { Slider } from "../../../../src/index.jsx";
 import { SliderSkeleton } from "../../SliderSkeleton.jsx";
 import { useProjects, splitItems } from "../../useDemoData.js";
-import { DocsIntro, DocsBlock } from "./DocsBlocks.jsx";
+import { DocsIntro, DocsBlock, DocsExampleHeading } from "./DocsBlocks.jsx";
 import { CodeBlock } from "../../components/CodeBlock.jsx";
 
-const SNIPPET = `// Prev / close / next buttons inside the lightbox
+const SNIPPET = `// Default — click the active panel to zoom into the lightbox
+<Slider items={items} />
+
+// Add prev / close / next buttons inside the lightbox
 <Slider items={items} lightboxControls />
 
-// No lightbox at all — the active panel's click is yours
+// No lightbox — handle the active panel's click yourself
 <Slider
   items={items}
   lightbox={false}
-  onItemClick={(item, index) => console.log(item.title, index)}
+  onItemClick={(item) => alert(\`\${item.title} clicked\`)}
 />`;
 
 export default function LightboxPage() {
   const projects = useProjects();
-  const [withControls, noLightbox] = splitItems(projects);
-  const [clicked, setClicked] = useState(null);
+  const [setA, setB] = splitItems(projects);
 
   return (
     <>
-      <DocsIntro title="Lightbox">
-        Clicking the active panel zooms it into a fullscreen, swipeable
-        lightbox via a shared-element view transition. The first slider adds
-        the opt-in <code>lightboxControls</code> bar. The second disables the
-        lightbox entirely — clicking its active panel fires{" "}
-        <code>onItemClick</code> instead.
+      <DocsIntro>
+        Clicking the active panel zooms it into a fullscreen, swipeable lightbox
+        via a shared-element view transition. Below: the default lightbox, one
+        with the opt-in <code>lightboxControls</code> bar, and one with the
+        lightbox disabled so the click fires your own handler instead.
       </DocsIntro>
-      {withControls ? (
-        <Slider items={withControls} lightboxControls />
-      ) : (
-        <SliderSkeleton />
-      )}
-      {noLightbox ? (
+      {setA ? <Slider items={setA} /> : <SliderSkeleton />}
+      <DocsExampleHeading title="In-lightbox controls">
+        <code>lightboxControls</code> adds prev / close / next buttons inside
+        the lightbox (on every breakpoint).
+      </DocsExampleHeading>
+      {setB ? <Slider items={setB} lightboxControls /> : <SliderSkeleton />}
+      <DocsExampleHeading title="Custom click handler">
+        <code>lightbox</code> set to <code>false</code> disables the zoom; the
+        active panel&apos;s click fires <code>onItemClick</code> instead — here
+        it pops a browser alert.
+      </DocsExampleHeading>
+      {projects ? (
         <Slider
-          items={noLightbox}
+          items={projects}
           lightbox={false}
-          onItemClick={(item) => setClicked(item.title)}
+          onItemClick={(item) => alert(`${item.title} clicked`)}
         />
       ) : (
         <SliderSkeleton />
       )}
       <DocsBlock>
-        <p aria-live="polite">
-          {clicked
-            ? `onItemClick fired: “${clicked}”`
-            : "Click the second slider's active panel to fire onItemClick."}
-        </p>
         <CodeBlock code={SNIPPET} />
       </DocsBlock>
     </>

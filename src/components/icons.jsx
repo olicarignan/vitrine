@@ -122,6 +122,69 @@ export const MuteIcon = () => (
   </svg>
 );
 
+// Picture-in-picture: outer frame with a small inset panel.
+export const PipIcon = () => (
+  <svg
+    width="14"
+    height="14"
+    viewBox="0 0 14 14"
+    fill="none"
+    xmlns="http://www.w3.org/2000/svg"
+    aria-hidden="true"
+  >
+    <rect
+      x="1"
+      y="2.5"
+      width="12"
+      height="9"
+      rx="1.5"
+      stroke="currentColor"
+      strokeWidth="1.3"
+    />
+    <rect x="6.75" y="6.25" width="5.25" height="4.25" rx="1" fill="currentColor" />
+  </svg>
+);
+
+// Enter fullscreen: four corner brackets.
+export const FullscreenIcon = () => (
+  <svg
+    width="14"
+    height="14"
+    viewBox="0 0 14 14"
+    fill="none"
+    xmlns="http://www.w3.org/2000/svg"
+    aria-hidden="true"
+  >
+    <path
+      d="M5 1H1V5M9 1H13V5M5 13H1V9M9 13H13V9"
+      stroke="currentColor"
+      strokeWidth="1.4"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    />
+  </svg>
+);
+
+// metamorphosis IconDefs (shared 24×24 icon space). The morph maps segment N
+// of one icon to segment N of the other, so BOTH must list exactly three
+// segments — pad the shorter icon with a collapsed center point `[12,12,12,12]`
+// (rendered invisible) or the morph reads past the target's array and throws.
+// Play is an outlined right-pointing triangle; pause is two vertical bars.
+export const PLAY_ICON_DEF = {
+  lines: [
+    [9, 6, 18, 12],
+    [18, 12, 9, 18],
+    [9, 18, 9, 6],
+  ],
+};
+export const PAUSE_ICON_DEF = {
+  lines: [
+    [9.5, 6, 9.5, 18],
+    [14.5, 6, 14.5, 18],
+    [12, 12, 12, 12],
+  ],
+};
+
 export const CloseIcon = () => (
   <svg
     width="14"

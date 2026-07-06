@@ -23,6 +23,26 @@ export const PlainCaption = ({ as: Tag = "span", children }) => (
 // several sliders on a page, none may start a transition while one is running.
 let activeViewTransition = null;
 
+// Parse the `aspectRatio` prop into a width/height number. Accepts a number
+// (`1.5`), a ratio string (`"16/9"` or `"16:9"`), or a numeric string
+// (`"1.5"`). Returns null for unset/invalid — the track then uses its natural
+// sizing (coverflow falls back to its own default box).
+function parseAspect(value) {
+  if (value == null) return null;
+  if (typeof value === "number") return value > 0 ? value : null;
+  if (typeof value === "string") {
+    const parts = value.split(/[/:]/);
+    if (parts.length === 2) {
+      const w = parseFloat(parts[0]);
+      const h = parseFloat(parts[1]);
+      return w > 0 && h > 0 ? w / h : null;
+    }
+    const num = parseFloat(value);
+    return num > 0 ? num : null;
+  }
+  return null;
+}
+
 /**
  * Draggable project slider with a shared-element zoom into a fullscreen lightbox.
  *
@@ -31,23 +51,25 @@ let activeViewTransition = null;
  *
  * @param {object}   props
  * @param {Array}    props.items              Project items (see item shape below).
- * @param {"row"|"stack"|"coverflow"} [props.variant="row"] Track layout: the scroll-snap carousel (default), a deck-cycling card stack, or a 3D coverflow. Stack and coverflow ignore `item.video` in the track (poster only — the lightbox still plays it).
+ * @param {"row"|"stack"|"coverflow"} [props.variant="row"] Track layout: the scroll-snap carousel (default), a deck-cycling card stack, or a 3D coverflow. Stack and coverflow ignore `item.video` in the track (poster only — the coverflow lightbox still plays it). The stack has no lightbox: clicking the top card fires `onItemClick` if given, otherwise nothing.
  * @param {number}   [props.contentWidth=628] Desktop width (px) of the active panel's content column.
  * @param {number}   [props.gap=32]           Desktop gap (px) between panels.
  * @param {number}   [props.columns=4]        Notional grid columns, used only to align the meta text.
  * @param {number}   [props.metaOffsetColumns=0] Shift the meta text right by N columns on desktop (0 = flush with the slide).
  * @param {number}   [props.sideMargin=24]    Minimum viewport margin (px per side) the content column keeps.
  * @param {number}   [props.maxItemHeight=520] Max height (px) of a panel; taller images scale down (keeping ratio).
+ * @param {number|string} [props.aspectRatio]  Force every panel into a fixed width/height box (cover-cropped) — a number (`1.5`) or ratio string (`"16/9"`, `"3:2"`). Off by default: `row` and `stack` keep each image's own ratio. `coverflow` always uses a fixed box (default ≈ 3:4) and this overrides it. The box is bounded by `maxItemHeight`.
  * @param {string}   [props.sizes]            `sizes` hint for the panel <img>.
  * @param {string}   [props.lightboxSizes]    `sizes` hint forwarded to the lightbox images.
  * @param {React.ElementType} [props.Caption]  Caption renderer (takes `as` + `children`). Defaults to metamorphosis's morphing `<TextMorph>`; pass `PlainCaption` (or your own) to opt out.
  * @param {boolean}  [props.lightboxControls=false] Show prev/close/next buttons in the lightbox (on all breakpoints). Off by default — the caption carries the context and swipe/keys navigate.
  * @param {string}   [props.transitionName]   Override the auto-generated per-instance shared-element view-transition name.
- * @param {boolean}  [props.lightbox=true]    Set false to disable the lightbox entirely: clicking a panel no longer zooms; the active panel's click instead fires `onItemClick` (if given).
- * @param {Function} [props.onItemClick]      Called with `(item, index)` when the active panel is clicked and `lightbox` is false.
+ * @param {boolean}  [props.lightbox=true]    Set false to disable the lightbox entirely: clicking a panel no longer zooms; the active panel's click instead fires `onItemClick` (if given). Ignored by `variant="stack"`, which never has a lightbox.
+ * @param {Function} [props.onItemClick]      Called with `(item, index)` when the active panel is clicked and the lightbox is disabled (or the variant is `"stack"`).
+ * @param {boolean}  [props.loop]             Endless scroll: the item array loops seamlessly. Defaults on for `"stack"` and `"coverflow"`, off for `"row"`. Arrow keys and the `arrows` buttons wrap when looping.
  * @param {boolean}  [props.arrows=false]     Show prev/next buttons beside the caption.
  * @param {boolean}  [props.pagination=false] Show one dot per panel beside the caption; the active dot tracks scrolling and clicking a dot navigates.
- * @param {boolean}  [props.videoControls=false] Show play/pause + mute + scrubber over the active video panel (slider and lightbox). Videos still autoplay muted.
+ * @param {boolean|"minimal"} [props.videoControls=false] Video playback UI: a hover play/pause toggle on the slider panel; a play/pause toggle + gliding progress bar in the lightbox that, unless `"minimal"`, expands on hover into timestamp + mute / PiP / fullscreen. Videos still autoplay muted.
  *
  * Item shape (all image fields are plain strings — bring your own CMS/transform):
  * {
@@ -74,12 +96,14 @@ export function Slider({
   metaOffsetColumns = 0,
   sideMargin = 24,
   maxItemHeight = 520,
+  aspectRatio,
   sizes = "(min-width: 700px) 628px, 82vw",
   lightboxSizes = "84vw",
   Caption = TextMorph,
   lightbox = true,
   lightboxControls = false,
   onItemClick,
+  loop,
   arrows = false,
   pagination = false,
   videoControls = false,
@@ -110,6 +134,17 @@ export function Slider({
   const vtName =
     transitionName ?? `vitrine-${reactId.replace(/[^a-zA-Z0-9_-]/g, "")}`;
 
+  // The deck never zooms: cards are uniform crops of a cycling stack, so a
+  // shared-element morph has no stable target. `lightbox` is ignored there.
+  const lightboxEnabled = lightbox && variant !== "stack";
+  // Endless scroll: stack and coverflow loop by default, the row opts in.
+  const loops = loop ?? variant !== "row";
+  // Forced panel ratio (null = natural sizing; coverflow uses its own default).
+  const forcedAspect = parseAspect(aspectRatio);
+  // The coverflow lightbox mirrors the track's styling (cover-cropped boxes +
+  // 3D neighbors); the active card's box ratio is captured at open time.
+  const lightboxAspectRef = useRef(null);
+
   const handleLayoutChange = useCallback((layout) => {
     setMetaLayout((prev) =>
       prev.metaInset === layout.metaInset &&
@@ -131,8 +166,9 @@ export function Slider({
         (rootRef.current && rootRef.current.contains(document.activeElement));
       if (!active) return;
 
-      // The stack cycles infinitely (its goTo wraps); the scroll tracks clamp.
-      const wraps = variant === "stack";
+      // Looping tracks wrap at the ends (their goTo handles the modulo);
+      // non-looping ones clamp.
+      const wraps = loops;
       if (e.key === "ArrowRight") {
         const next = wraps
           ? activeIndex + 1
@@ -151,7 +187,7 @@ export function Slider({
     };
     window.addEventListener("keydown", handleKeyDown);
     return () => window.removeEventListener("keydown", handleKeyDown);
-  }, [activeIndex, items.length, lightboxOpen, variant]);
+  }, [activeIndex, items.length, lightboxOpen, loops]);
 
   // Always opens on the slider's current active item — the single source of
   // truth shared with the lightbox — so the two stay in sync.
@@ -160,6 +196,11 @@ export function Slider({
     const sliderItems = trackApiRef.current?.getItemEls();
     if (!sliderItems?.[index]) return;
     if (activeViewTransition) return;
+
+    // Captured pre-zoom so the coverflow lightbox can mirror the card's box
+    // ratio (cards are uniform there, so the active one is representative).
+    const rect = sliderItems[index].getBoundingClientRect();
+    lightboxAspectRef.current = rect.height > 0 ? rect.width / rect.height : 1;
 
     if (document.startViewTransition) {
       // Fade out shadow before snapshot
@@ -194,10 +235,10 @@ export function Slider({
   // with the lightbox disabled, hand the click to the consumer.
   const handleItemOpen = useCallback(
     (index) => {
-      if (lightbox) openLightbox();
+      if (lightboxEnabled) openLightbox();
       else onItemClick?.(items[index], index);
     },
-    [lightbox, onItemClick, items, openLightbox],
+    [lightboxEnabled, onItemClick, items, openLightbox],
   );
 
   // Hide slider videos after backdrop fades in, restore on close
@@ -336,7 +377,8 @@ export function Slider({
   const active = items[activeIndex];
   // With the lightbox off and no click callback, panels are display-only:
   // no button semantics, no action cursor, and the morph cursor stays hidden.
-  const itemsClickable = lightbox || typeof onItemClick === "function";
+  const itemsClickable =
+    lightboxEnabled || typeof onItemClick === "function";
   // Inline style beats CSS specificity: with the morph cursor on, hide the
   // native cursor (unless the panel isn't clickable, where the inline value
   // must also beat the morph-cursor CSS `none`).
@@ -344,7 +386,7 @@ export function Slider({
     ? itemsClickable
       ? "none"
       : "default"
-    : lightbox
+    : lightboxEnabled
       ? "zoom-in"
       : itemsClickable
         ? "pointer"
@@ -375,13 +417,15 @@ export function Slider({
         metaOffsetColumns={metaOffsetColumns}
         sideMargin={sideMargin}
         maxItemHeight={maxItemHeight}
+        aspectRatio={forcedAspect}
         sizes={sizes}
         videoControls={videoControls}
         itemsClickable={itemsClickable}
         itemCursor={itemCursor}
+        loop={loops}
         onActiveIndexChange={setActiveIndex}
         onItemOpen={handleItemOpen}
-        openOnSettle={lightbox}
+        openOnSettle={lightboxEnabled}
         onLayoutChange={handleLayoutChange}
       />
       <motion.div
@@ -397,14 +441,15 @@ export function Slider({
           <br />
           <Caption as="p">{active?.meta}</Caption>
         </div>
-        {(arrows || pagination) && (
-          <div className="slider__controls">
-            {arrows && (
+      </motion.div>
+      {(arrows || pagination) && (
+        <motion.div className="slider__controls" variants={itemFadeIn}>
+          {arrows && (
               <button
                 type="button"
                 className="slider__nav"
                 onClick={() => trackApiRef.current?.goTo(activeIndex - 1)}
-                disabled={variant !== "stack" && activeIndex === 0}
+                disabled={!loops && activeIndex === 0}
                 aria-label="Previous"
               >
                 <ChevronLeftIcon />
@@ -429,17 +474,16 @@ export function Slider({
                 type="button"
                 className="slider__nav"
                 onClick={() => trackApiRef.current?.goTo(activeIndex + 1)}
-                disabled={variant !== "stack" && activeIndex === items.length - 1}
+                disabled={!loops && activeIndex === items.length - 1}
                 aria-label="Next"
               >
                 <ChevronRightIcon />
               </button>
             )}
-          </div>
-        )}
-      </motion.div>
+        </motion.div>
+      )}
       <AnimatePresence>
-        {lightbox && lightboxOpen && (
+        {lightboxEnabled && lightboxOpen && (
           <Lightbox
             items={items}
             activeIndex={activeIndex}
@@ -448,6 +492,9 @@ export function Slider({
             controls={lightboxControls}
             videoControls={videoControls}
             transitionName={vtName}
+            coverflow={variant === "coverflow"}
+            itemAspect={lightboxAspectRef.current}
+            loop={loops}
             onActiveIndexChange={handleLightboxActiveChange}
             onClose={closeLightbox}
           />

@@ -33,7 +33,7 @@ const ITEM = `{
 export default function GettingStarted() {
   return (
     <>
-      <DocsIntro title="Getting started">
+      <DocsIntro>
         Vitrine is a React gallery slider with a shared-element zoom into a
         fullscreen lightbox. Install it, import the stylesheet once, and pass
         an array of items.
@@ -51,6 +51,15 @@ export default function GettingStarted() {
         <CodeBlock code={TOKENS} label="Copy CSS tokens" />
         <h3>Item shape</h3>
         <CodeBlock code={ITEM} label="Copy item shape" />
+        <h3>Multiple sliders</h3>
+        <p>
+          Any number of sliders can live on one page: each instance generates
+          its own shared-element view-transition name, so every lightbox zooms
+          back to the right panel. Pass <code>transitionName</code> to override
+          the generated name. The one caveat is <code>morphCursor</code> — each
+          slider renders its own follower cursor, so enable it on at most one
+          slider per page.
+        </p>
         <p>
           Note: don&apos;t wrap the slider in <code>&lt;StrictMode&gt;</code> —
           its measure / scroll / view-transition effects rely on a single pass.

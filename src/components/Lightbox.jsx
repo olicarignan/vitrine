@@ -10,12 +10,60 @@ import {
 import { motion } from "motion/react";
 import { TextMorph } from "metamorphosis/react";
 import { ChevronLeftIcon, ChevronRightIcon, CloseIcon } from "./icons";
-import { VideoControls } from "./VideoControls";
+import { LightboxVideoControls } from "./LightboxVideoControls";
 
 // Mobile drag-down-to-dismiss: release past this drop distance (px) or flick
 // velocity (px per ms) dismisses; otherwise the image springs back.
 const DISMISS_THRESHOLD = 110;
 const DISMISS_VELOCITY = 0.55;
+
+// Coverflow lightbox projection: neighbors rotate toward the vanishing point,
+// recede and shrink — a larger-scale echo of the track's own projector.
+const COVERFLOW_MAX_ROTATE = 35;
+const COVERFLOW_MAX_DEPTH = 160;
+const COVERFLOW_PERSPECTIVE = 1400;
+
+/**
+ * Per-item projection, shared by the reveal effect and the scroll handler.
+ * Row mode keeps the original dim + hairline scale; coverflow mode adds the
+ * 3D rotation and a z-order falloff. The active (centered) item stays flat so
+ * drag-dismiss transforms and the view-transition snapshot are unaffected.
+ *
+ * The 3D transform goes on the item's inner wrapper, never the item itself:
+ * the item is the scroll-snap target, and snap positions are computed from
+ * the *transformed* bounding box — rotating the item shrinks/shifts its box
+ * each frame and the snap chases a moving target instead of settling. (Same
+ * reason the slider's coverflow track projects onto `.slider__item-inner`.)
+ * The untransitioned inner also tracks the scroll 1:1, where the item's own
+ * 0.4s transform transition would drag the rotation behind it.
+ *
+ * The perspective is local (inside the inner's transform) rather than a
+ * shared one on the track: the item carries filter/opacity through the
+ * reveal, close, and dim choreography, and those are grouping properties
+ * that force `transform-style: flat` — a track perspective + preserve-3d
+ * chain silently degrades into an orthographic squash whose rotation
+ * direction the eye reads backwards.
+ */
+function projectItem(el, rect, center, coverflow) {
+  const itemCenter = rect.left + rect.width / 2;
+  const dist = Math.abs(itemCenter - center);
+  const edgeDist = Math.max(0, dist - rect.width / 2);
+  const norm = Math.min(edgeDist / (window.innerWidth * 0.3), 1);
+  el.style.filter = `blur(0px) brightness(${1 - norm * 0.4})`;
+  if (coverflow) {
+    const t = Math.max(-2, Math.min(2, (itemCenter - center) / rect.width));
+    const a = Math.min(Math.abs(t), 1);
+    const inner = el.firstElementChild; // .lightbox__item-inner
+    inner.style.transform =
+      `perspective(${COVERFLOW_PERSPECTIVE}px) ` +
+      `rotateY(${(-Math.sign(t) * a * COVERFLOW_MAX_ROTATE).toFixed(2)}deg) ` +
+      `translateZ(${(-Math.abs(t) * COVERFLOW_MAX_DEPTH).toFixed(1)}px) ` +
+      `scale(${(1 - Math.abs(t) * 0.06).toFixed(4)})`;
+    el.style.zIndex = String(100 - Math.round(Math.abs(t) * 10));
+  } else {
+    el.style.transform = `scale(${1 - norm * 0.01})`;
+  }
+}
 
 /**
  * Fullscreen, draggable lightbox. Rendered by <Slider> during the shared-element
@@ -29,6 +77,9 @@ const DISMISS_VELOCITY = 0.55;
  * @param {boolean}  [props.controls=false]     Render the prev/close/next buttons (on all breakpoints).
  * @param {boolean}  [props.videoControls=false] Show play/pause + mute + scrubber over the active video item.
  * @param {string}   [props.transitionName="slider-active"] Shared-element view-transition name; `<Slider>` passes its per-instance name.
+ * @param {boolean}  [props.coverflow=false]     Mirror the coverflow track: items become uniform cover-cropped boxes and neighbors carry the 3D rotation.
+ * @param {number}   [props.itemAspect]          Box ratio (w/h) for coverflow items; `<Slider>` captures it from the active card at open time.
+ * @param {boolean}  [props.loop=false]          Endless scroll, mirroring the slider's loop state: the item array loops and arrow keys / controls wrap.
  * @param {Function} props.onActiveIndexChange  Called with the new index as the user scrolls.
  * @param {Function} props.onClose              Called to dismiss the lightbox.
  */
@@ -40,6 +91,9 @@ export function Lightbox({
   controls = false,
   videoControls = false,
   transitionName = "slider-active",
+  coverflow = false,
+  itemAspect,
+  loop = false,
   onActiveIndexChange,
   onClose,
 }) {
@@ -66,7 +120,69 @@ export function Lightbox({
   const [staggerDone, setStaggerDone] = useState(false);
   const revealedRef = useRef(false);
   const scrollRafTicking = useRef(false);
-  const lastActiveRef = useRef(initialIndex);
+
+  /* Endless scroll (`loop`) — the slider track's clone-set machinery, mirrored
+     (see RowTrack.jsx): whole clone sets on both sides of the real set, an
+     invisible one-span teleport when the scroll drifts past the padded window,
+     and a re-seat onto the real set whenever scrolling settles. `activeIndex`
+     stays a REAL item index throughout; only the internal geometry works in
+     positions across clones + real. */
+  const n = items.length;
+  const copies = loop && n > 0 ? Math.max(2, Math.ceil(8 / n)) : 0;
+  const sets = 2 * copies + 1;
+  const smoothRef = useRef(false);
+  const smoothTimer = useRef(null);
+  const idleTimer = useRef(null);
+
+  // Positional index of the closest-to-center element (clones included).
+  const lastActiveRef = useRef(copies * n + initialIndex);
+
+  // The scrollLeft that centers an element in the track.
+  const centerTargetFor = useCallback(
+    (track, el) =>
+      el.offsetLeft - (track.clientWidth - el.offsetWidth) / 2,
+    [],
+  );
+
+  const beginSmooth = useCallback(() => {
+    smoothRef.current = true;
+    clearTimeout(smoothTimer.current);
+    smoothTimer.current = setTimeout(() => {
+      smoothRef.current = false;
+    }, 800);
+  }, []);
+
+  // Instantly re-seat the scroll on the real set — the shift is a multiple of
+  // the set span, so the pixels don't change. Runs whenever scrolling settles.
+  const normalize = useCallback(() => {
+    const track = trackRef.current;
+    if (!track || !copies) return;
+    if (dragState.current.isDragging || freezeRef.current.frozen) return;
+    const itemEls = track.querySelectorAll(".lightbox__item");
+    if (n === 0 || itemEls.length !== sets * n) return;
+    const span = itemEls[n].offsetLeft - itemEls[0].offsetLeft;
+    if (!span) return;
+    let closest = 0;
+    let closestDist = Infinity;
+    for (let i = 0; i < itemEls.length; i++) {
+      const d = Math.abs(centerTargetFor(track, itemEls[i]) - track.scrollLeft);
+      if (d < closestDist) {
+        closestDist = d;
+        closest = i;
+      }
+    }
+    const set = Math.floor(closest / n);
+    if (set !== copies) track.scrollLeft += (copies - set) * span;
+    smoothRef.current = false;
+  }, [copies, sets, n, centerTargetFor]);
+
+  useEffect(() => {
+    const track = trackRef.current;
+    if (!track || !copies) return;
+    const onEnd = () => normalize();
+    track.addEventListener("scrollend", onEnd);
+    return () => track.removeEventListener("scrollend", onEnd);
+  }, [copies, normalize]);
 
   // Reveal neighbors after view transition finishes
   useEffect(() => {
@@ -79,14 +195,7 @@ export function Lightbox({
         const itemEls = track.querySelectorAll(".lightbox__item");
         const center = window.innerWidth / 2;
         itemEls.forEach((item) => {
-          const rect = item.getBoundingClientRect();
-          const itemCenter = rect.left + rect.width / 2;
-          const dist = Math.abs(itemCenter - center);
-          const halfItem = rect.width / 2;
-          const edgeDist = Math.max(0, dist - halfItem);
-          const norm = Math.min(edgeDist / (window.innerWidth * 0.3), 1);
-          item.style.filter = `blur(0px) brightness(${1 - norm * 0.4})`;
-          item.style.transform = `scale(${1 - norm * 0.01})`;
+          projectItem(item, item.getBoundingClientRect(), center, coverflow);
         });
       }
     }, 500);
@@ -98,7 +207,7 @@ export function Lightbox({
       clearTimeout(staggerTimer);
       clearTimeout(timer);
     };
-  }, []);
+  }, [coverflow]);
 
   // Body scroll lock
   useEffect(() => {
@@ -115,10 +224,21 @@ export function Lightbox({
   useLayoutEffect(() => {
     const track = trackRef.current;
     if (!track) return;
-    const el = track.querySelectorAll(".lightbox__item")[openIndexRef.current];
+    const itemEls = track.querySelectorAll(".lightbox__item");
+    // With loop, the real set sits behind `copies` sets of clone runway.
+    const el = itemEls[copies * n + openIndexRef.current];
     if (!el) return;
     track.scrollLeft = el.offsetLeft - (track.clientWidth - el.offsetWidth) / 2;
-  }, []);
+    // Coverflow: project every item before first paint. The inner transform
+    // has no transition (it must track the scroll 1:1), so without this the
+    // neighbors would pop from flat to rotated when the reveal kicks in.
+    if (coverflow) {
+      const center = window.innerWidth / 2;
+      itemEls.forEach((item) =>
+        projectItem(item, item.getBoundingClientRect(), center, true),
+      );
+    }
+  }, [coverflow, copies, n]);
 
   // Scroll handler — rAF-batched. Only updates inline styles on items within ±2 of the active.
   const handleScroll = useCallback(() => {
@@ -131,6 +251,33 @@ export function Lightbox({
 
       const itemEls = track.querySelectorAll(".lightbox__item");
       const center = window.innerWidth / 2;
+
+      if (copies && !smoothRef.current && !freezeRef.current.frozen) {
+        // Loop: teleport by one set-span when the scroll drifts past the
+        // window around the real set — same pixels, so invisible. Never under
+        // a native smooth scroll (it would visibly rewind); those re-seat on
+        // settle. The window pads the real set's span by ¾ span each side so
+        // normalize()'s re-seat never lands on a boundary (no ping-pong).
+        if (n > 0 && itemEls.length === sets * n) {
+          const span = itemEls[n].offsetLeft - itemEls[0].offsetLeft;
+          const home = centerTargetFor(track, itemEls[copies * n]);
+          const s = track.scrollLeft;
+          let shift = 0;
+          if (span && s < home - span * 0.75) shift = span;
+          else if (span && s > home + span * 1.75) shift = -span;
+          if (shift) {
+            track.scrollLeft = s + shift;
+            // Keep an in-flight drag's absolute base in the same frame.
+            if (dragState.current.isDragging)
+              dragState.current.scrollLeft += shift;
+          }
+        }
+      }
+      if (copies) {
+        // Settle fallback for browsers without `scrollend`.
+        clearTimeout(idleTimer.current);
+        idleTimer.current = setTimeout(normalize, 200);
+      }
 
       const rects = new Array(itemEls.length);
       let closest = 0;
@@ -147,7 +294,6 @@ export function Lightbox({
       }
 
       if (revealedRef.current) {
-        const vw = window.innerWidth;
         const last = lastActiveRef.current;
         const lo = Math.min(closest, last) - 2;
         const hi = Math.max(closest, last) + 2;
@@ -156,22 +302,17 @@ export function Lightbox({
           i <= Math.min(itemEls.length - 1, hi);
           i++
         ) {
-          const rect = rects[i];
-          const itemCenter = rect.left + rect.width / 2;
-          const dist = Math.abs(itemCenter - center);
-          const halfItem = rect.width / 2;
-          const edgeDist = Math.max(0, dist - halfItem);
-          const norm = Math.min(edgeDist / (vw * 0.3), 1);
-          itemEls[i].style.filter = `blur(0px) brightness(${1 - norm * 0.4})`;
-          itemEls[i].style.transform = `scale(${1 - norm * 0.01})`;
+          projectItem(itemEls[i], rects[i], center, coverflow);
         }
       }
 
       lastActiveRef.current = closest;
-      onActiveIndexChange(closest);
-      setActiveIndex(closest);
+      // Report the REAL item index; `closest` is positional across clones.
+      const real = copies ? closest % n : closest;
+      onActiveIndexChange(real);
+      setActiveIndex(real);
     });
-  }, [onActiveIndexChange]);
+  }, [onActiveIndexChange, coverflow, copies, sets, n, centerTargetFor, normalize]);
 
   useEffect(() => {
     const track = trackRef.current;
@@ -180,17 +321,40 @@ export function Lightbox({
     return () => track.removeEventListener("scroll", handleScroll);
   }, [handleScroll]);
 
-  const scrollToIndex = useCallback((index) => {
-    const track = trackRef.current;
-    if (!track) return;
-    const itemEls = track.querySelectorAll(".lightbox__item");
-    if (!itemEls[index]) return;
-    itemEls[index].scrollIntoView({
-      behavior: "smooth",
-      block: "nearest",
-      inline: "center",
-    });
-  }, []);
+  const scrollToIndex = useCallback(
+    (index) => {
+      const track = trackRef.current;
+      if (!track) return;
+      const itemEls = track.querySelectorAll(".lightbox__item");
+      let el;
+      if (copies) {
+        // Loop: several copies of the target exist — travel to the nearest
+        // one, so wrapping forward from the last item reaches the adjacent
+        // clone of the first instead of rewinding a whole set.
+        const real = ((index % n) + n) % n;
+        let bestDist = Infinity;
+        for (let s = 0; s < sets; s++) {
+          const cand = itemEls[s * n + real];
+          if (!cand) continue;
+          const d = Math.abs(centerTargetFor(track, cand) - track.scrollLeft);
+          if (d < bestDist) {
+            bestDist = d;
+            el = cand;
+          }
+        }
+        if (el) beginSmooth();
+      } else {
+        el = itemEls[index];
+      }
+      if (!el) return;
+      el.scrollIntoView({
+        behavior: "smooth",
+        block: "nearest",
+        inline: "center",
+      });
+    },
+    [copies, sets, n, centerTargetFor, beginSmooth],
+  );
 
   // Keyboard navigation
   useEffect(() => {
@@ -198,16 +362,18 @@ export function Lightbox({
       if (e.key === "Escape") {
         onClose();
       } else if (e.key === "ArrowRight") {
-        const next = Math.min(activeIndex + 1, items.length - 1);
+        const next = loop
+          ? activeIndex + 1
+          : Math.min(activeIndex + 1, items.length - 1);
         if (next !== activeIndex) scrollToIndex(next);
       } else if (e.key === "ArrowLeft") {
-        const prev = Math.max(activeIndex - 1, 0);
+        const prev = loop ? activeIndex - 1 : Math.max(activeIndex - 1, 0);
         if (prev !== activeIndex) scrollToIndex(prev);
       }
     };
     window.addEventListener("keydown", handleKeyDown);
     return () => window.removeEventListener("keydown", handleKeyDown);
-  }, [activeIndex, items.length, onClose, scrollToIndex]);
+  }, [activeIndex, items.length, loop, onClose, scrollToIndex]);
 
   // Undo the dismiss-drag scroll freeze: re-enable the track's clip/scroll and
   // restore the horizontal position in one synchronous block (no intermediate
@@ -400,13 +566,22 @@ export function Lightbox({
           .elementFromPoint(e.clientX, e.clientY)
           ?.closest(".lightbox__item");
         if (el) {
-          const itemEls = Array.from(
-            track.querySelectorAll(".lightbox__item"),
-          );
-          const index = itemEls.indexOf(el);
-          if (index >= 0) {
-            if (index === activeIndex) onClose();
-            else scrollToIndex(index);
+          const itemEls = Array.from(track.querySelectorAll(".lightbox__item"));
+          const pos = itemEls.indexOf(el);
+          if (pos >= 0) {
+            // At rest the track is normalized, so the active element sits at
+            // its real position — a visible clone of the active item is a
+            // different element and scrolls into place instead of closing.
+            const activePos = copies ? copies * n + activeIndex : activeIndex;
+            if (pos === activePos) onClose();
+            else if (copies) {
+              beginSmooth();
+              el.scrollIntoView({
+                behavior: "smooth",
+                block: "nearest",
+                inline: "center",
+              });
+            } else scrollToIndex(pos);
           }
         }
         return;
@@ -448,6 +623,8 @@ export function Lightbox({
           };
           const fallback = setTimeout(onScrollEnd, 300);
           track.addEventListener("scrollend", onScrollEnd, { once: true });
+          // The final snap may land on a clone; the settle normalizes it away.
+          if (copies) beginSmooth();
           itemEls[closest].scrollIntoView({
             behavior: "smooth",
             block: "nearest",
@@ -458,14 +635,16 @@ export function Lightbox({
 
       requestAnimationFrame(step);
     },
-    [activeIndex, onClose, scrollToIndex],
+    [activeIndex, onClose, scrollToIndex, copies, n, beginSmooth],
   );
 
-  // Video autoplay
+  // Video autoplay — real items only (clones never render a <video>).
   useEffect(() => {
     const track = trackRef.current;
     if (!track) return;
-    const itemEls = track.querySelectorAll(".lightbox__item");
+    const itemEls = track.querySelectorAll(
+      ".lightbox__item:not([data-clone])",
+    );
     const cleanups = [];
     itemEls.forEach((item, i) => {
       const video = item.querySelector("video");
@@ -480,9 +659,7 @@ export function Lightbox({
             onReady();
           } else {
             video.addEventListener("canplay", onReady, { once: true });
-            cleanups.push(() =>
-              video.removeEventListener("canplay", onReady),
-            );
+            cleanups.push(() => video.removeEventListener("canplay", onReady));
           }
         };
         const timer = setTimeout(startVideo, 300);
@@ -494,21 +671,37 @@ export function Lightbox({
     return () => cleanups.forEach((fn) => fn());
   }, [activeIndex]);
 
-  // Click handler for touch (pointer capture skips touch)
+  // Click handler for touch (pointer capture skips touch). `pos` is the
+  // element's position across clones + real set.
   const handleItemClick = useCallback(
-    (index) => {
+    (pos) => {
       if (dragDistRef.current >= 5) return;
-      if (index === activeIndex) onClose();
-      else scrollToIndex(index);
+      const activePos = copies ? copies * n + activeIndex : activeIndex;
+      if (pos === activePos) onClose();
+      else if (copies) {
+        const el = trackRef.current?.querySelectorAll(".lightbox__item")[pos];
+        if (el) {
+          beginSmooth();
+          el.scrollIntoView({
+            behavior: "smooth",
+            block: "nearest",
+            inline: "center",
+          });
+        }
+      } else scrollToIndex(pos);
     },
-    [activeIndex, onClose, scrollToIndex],
+    [activeIndex, onClose, scrollToIndex, copies, n, beginSmooth],
   );
 
   return (
     <div
       className={`lightbox${neighborsRevealed ? " lightbox--revealed" : ""}${
         controls ? " lightbox--controls" : ""
-      }`}
+      }${coverflow ? " lightbox--coverflow" : ""}`}
+      // The item box ratio only drives sizing in coverflow mode.
+      style={
+        coverflow && itemAspect ? { "--lb-item-aspect": itemAspect } : undefined
+      }
     >
       <motion.div
         className="lightbox__backdrop"
@@ -536,19 +729,25 @@ export function Lightbox({
           touchAction: "pan-x",
         }}
       >
-        {items.map((item, i) => (
-          <LightboxItem
-            key={item.id ?? i}
-            item={item}
-            index={i}
-            activeIndex={activeIndex}
-            sizes={sizes}
-            staggerDone={staggerDone}
-            transitionName={transitionName}
-            videoControls={videoControls}
-            onClick={handleItemClick}
-          />
-        ))}
+        {Array.from({ length: sets * n }, (_, pos) => {
+          const i = pos % n;
+          return (
+            <LightboxItem
+              key={`${Math.floor(pos / n)}:${items[i].id ?? i}`}
+              item={items[i]}
+              index={i}
+              pos={pos}
+              // Clones only exist when looping; the real set is the middle one.
+              clone={copies > 0 && Math.floor(pos / n) !== copies}
+              activeIndex={activeIndex}
+              sizes={sizes}
+              staggerDone={staggerDone}
+              transitionName={transitionName}
+              videoControls={videoControls}
+              onClick={handleItemClick}
+            />
+          );
+        })}
       </div>
       <div className="lightbox__meta" aria-live="polite">
         <Caption as="h2">{items[activeIndex]?.title}</Caption>
@@ -559,7 +758,7 @@ export function Lightbox({
           <button
             className="lightbox__nav"
             onClick={() => scrollToIndex(activeIndex - 1)}
-            disabled={activeIndex === 0}
+            disabled={!loop && activeIndex === 0}
             aria-label="Previous"
           >
             <ChevronLeftIcon />
@@ -574,7 +773,7 @@ export function Lightbox({
           <button
             className="lightbox__nav"
             onClick={() => scrollToIndex(activeIndex + 1)}
-            disabled={activeIndex === items.length - 1}
+            disabled={!loop && activeIndex === items.length - 1}
             aria-label="Next"
           >
             <ChevronRightIcon />
@@ -588,6 +787,8 @@ export function Lightbox({
 function LightboxItem({
   item,
   index,
+  pos = index,
+  clone = false,
   activeIndex,
   sizes,
   staggerDone,
@@ -596,9 +797,12 @@ function LightboxItem({
   onClick,
 }) {
   const hasHighRes = Boolean(item.highResSrc);
-  const videoUrl = item.video;
+  // Clones never render a <video> — one autoplaying element per item.
+  const videoUrl = clone ? undefined : item.video;
   const videoRef = useRef(null);
-  const isActive = index === activeIndex;
+  // Never on a clone: the --active class and the shared-element name must
+  // stay unique (closeLightbox targets `.lightbox__item--active`).
+  const isActive = !clone && index === activeIndex;
   const dist = Math.abs(index - activeIndex);
   const [highResLoaded, setHighResLoaded] = useState(false);
 
@@ -606,6 +810,8 @@ function LightboxItem({
     <div
       className={`lightbox__item${isActive ? " lightbox__item--active" : ""}`}
       data-index={index}
+      data-clone={clone ? "" : undefined}
+      aria-hidden={clone ? true : undefined}
       // The active item carries the per-instance shared-element name (inline —
       // the name is dynamic, so it can't live in the stylesheet). The stagger
       // delay is only for the initial reveal; once that's done we drop it so
@@ -621,64 +827,72 @@ function LightboxItem({
             ? { transitionDelay: `${dist * 0.06}s` }
             : undefined
       }
-      onClick={() => onClick(index)}
+      onClick={() => onClick(pos)}
     >
-      {/* Base layer — gives the item its height and paints immediately.
+      {/* Inner wrapper: the coverflow projector's 3D transform target. Must
+          stay the first child (projectItem reaches it via firstElementChild)
+          and layout-neutral in row mode. */}
+      <div className="lightbox__item-inner">
+        {/* Base layer — gives the item its height and paints immediately.
           When no hi-res is supplied this is the only image shown. */}
-      <picture className="lightbox__img lightbox__img--low">
-        {item.webpSrcSet && (
-          <source srcSet={item.webpSrcSet} sizes={sizes} type="image/webp" />
-        )}
-        <img
-          src={item.src}
-          srcSet={item.srcSet}
-          sizes={sizes}
-          alt={item.alt || item.title}
-          draggable={false}
-          loading={dist <= 1 ? "eager" : "lazy"}
-          decoding="async"
-        />
-      </picture>
-      {/* Hi-res layer fades in over the base once loaded. */}
-      {hasHighRes && (
-        <picture
-          className={`lightbox__img lightbox__img--high${highResLoaded ? " lightbox__img--ready" : ""}`}
-        >
-          {item.highResWebpSrcSet && (
-            <source
-              srcSet={item.highResWebpSrcSet}
-              sizes={sizes}
-              type="image/webp"
-            />
+        <picture className="lightbox__img lightbox__img--low">
+          {item.webpSrcSet && (
+            <source srcSet={item.webpSrcSet} sizes={sizes} type="image/webp" />
           )}
           <img
-            src={item.highResSrc}
-            srcSet={item.highResSrcSet}
+            src={item.src}
+            srcSet={item.srcSet}
             sizes={sizes}
-            alt=""
-            aria-hidden="true"
+            alt={item.alt || item.title}
             draggable={false}
             loading={dist <= 1 ? "eager" : "lazy"}
             decoding="async"
-            onLoad={() => setHighResLoaded(true)}
           />
         </picture>
-      )}
-      {videoUrl && (
-        <video
-          ref={videoRef}
-          src={videoUrl}
-          muted
-          playsInline
-          loop
-          // The scrubber needs the duration up front; without controls stay lazy.
-          preload={videoControls ? "metadata" : "none"}
-          draggable={false}
-        />
-      )}
-      {videoUrl && videoControls && isActive && (
-        <VideoControls videoRef={videoRef} />
-      )}
+        {/* Hi-res layer fades in over the base once loaded. */}
+        {hasHighRes && (
+          <picture
+            className={`lightbox__img lightbox__img--high${highResLoaded ? " lightbox__img--ready" : ""}`}
+          >
+            {item.highResWebpSrcSet && (
+              <source
+                srcSet={item.highResWebpSrcSet}
+                sizes={sizes}
+                type="image/webp"
+              />
+            )}
+            <img
+              src={item.highResSrc}
+              srcSet={item.highResSrcSet}
+              sizes={sizes}
+              alt=""
+              aria-hidden="true"
+              draggable={false}
+              loading={dist <= 1 ? "eager" : "lazy"}
+              decoding="async"
+              onLoad={() => setHighResLoaded(true)}
+            />
+          </picture>
+        )}
+        {videoUrl && (
+          <video
+            ref={videoRef}
+            src={videoUrl}
+            muted
+            playsInline
+            loop
+            // The scrubber needs the duration up front; without controls stay lazy.
+            preload={videoControls ? "metadata" : "none"}
+            draggable={false}
+          />
+        )}
+        {videoUrl && videoControls && isActive && (
+          <LightboxVideoControls
+            videoRef={videoRef}
+            minimal={videoControls === "minimal"}
+          />
+        )}
+      </div>
     </div>
   );
 }

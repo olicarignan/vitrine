@@ -79,7 +79,11 @@
         filter 0.35s cubic-bezier(0.2, 0, 0, 1);
 
       @media (max-width: 699px) {
-        transition: none;
+        /* Keep the transition on mobile too — it's what smooths the row's
+           scroll-driven scale/brightness (and the hover scale) between active
+           panels; without it they snap frame-to-frame. Coverflow and stack
+           still disable it via their own rules (they drive transforms
+           per-frame). */
         border-radius: 12px;
         will-change: transform, filter;
       }
@@ -129,7 +133,10 @@
       /* The image defines the panel's box; the video overlay fills it. */
       object-fit: cover;
       opacity: 0;
-      transition: opacity 0.3s ease;
+      /* filter eases the hover blur behind the play/pause toggle. */
+      transition:
+        opacity 0.3s ease,
+        filter 0.25s ease;
     }
 
     &.slider__item--active video {
@@ -142,8 +149,9 @@
   }
 
   /* Deck-cycling variant (`variant="stack"`): the track is a fixed-height
-     stage, cards are absolutely positioned uniform boxes moved only by
-     transform + z-index (set inline by StackTrack). */
+     stage; cards are absolutely positioned, centered, and moved only by
+     transform + z-index (set inline by StackTrack). Each keeps its own source
+     aspect ratio unless `aspectRatio` forces a uniform box (--stack-fixed). */
   .slider__track--stack {
     display: block;
     overflow: visible;
@@ -152,21 +160,35 @@
     padding-block: 0;
     margin-block: 0;
     position: relative;
+    /* The cards' stacking z-indexes are an internal affair — contain them so
+       they can't rise above the host page's own layers. */
+    isolation: isolate;
 
-    .slider__item {
+    /* The deck's bounding box, aligned to the content column. Cards center
+       inside it; --stack-w / --stack-h cap each card's intrinsic size. */
+    .slider__stack-stage {
       position: absolute;
       top: 0;
-      max-width: none;
-      will-change: transform;
+    }
 
-      @media (max-width: 699px) {
-        width: auto;
-      }
+    /* Each card shrink-wraps its image and centers in the stage (inset:0 +
+       margin:auto), so cards of different aspect ratios sit in a common pile
+       without a fixed card box. Centering is pure layout — the transform is
+       left free for motion (drag / peek / lean). */
+    .slider__item {
+      position: absolute;
+      inset: 0;
+      margin: auto;
+      width: fit-content;
+      height: fit-content;
+      max-width: 100%;
+      max-height: 100%;
+      will-change: transform;
     }
 
     .slider__item-inner {
-      width: 100%;
-      height: 100%;
+      width: fit-content;
+      height: fit-content;
       /* The stage transform belongs to the card (motion); disable the hover
          lift so the two never fight. */
       transition: none;
@@ -180,10 +202,49 @@
       }
     }
 
-    /* Uniform card box: cover-crop the poster into it so deck edges align.
+    /* Poster shown at its own aspect ratio, scaled to fit inside the box.
        (No video in this variant — the lightbox still plays it.) */
     picture {
       display: block;
+      width: fit-content;
+      height: fit-content;
+    }
+
+    .slider__item img {
+      display: block;
+      width: auto;
+      height: auto;
+      max-width: var(--stack-w);
+      max-height: var(--stack-h);
+      /* Don't force the base zoom-in cursor here — inherit the card's grab. */
+      cursor: inherit;
+    }
+
+    /* Soft edge so the peeking back cards read against the top one. */
+    .slider__item:not(.slider__item--active) .slider__item-inner {
+      box-shadow: 0 -4px 16px rgba(0, 0, 0, 0.08);
+    }
+
+    /* The top card is drag-first: grab hand, grabbing while held. */
+    .slider__item--active {
+      cursor: grab;
+
+      &:active {
+        cursor: grabbing;
+      }
+    }
+  }
+
+  /* aspectRatio forced on the stack: cards become a uniform cover-cropped box
+     (--stack-w × --stack-h) instead of each keeping its own source shape. */
+  .slider__track--stack-fixed {
+    .slider__item {
+      width: var(--stack-w);
+      height: var(--stack-h);
+    }
+
+    .slider__item-inner,
+    picture {
       width: 100%;
       height: 100%;
     }
@@ -195,18 +256,19 @@
       max-height: none;
       object-fit: cover;
     }
-
-    /* Soft edge so the peeking back cards read against the top one. */
-    .slider__item:not(.slider__item--active) .slider__item-inner {
-      box-shadow: 0 -4px 16px rgba(0, 0, 0, 0.08);
-    }
   }
 
-  /* Coverflow variant (`variant="coverflow"`): the row engine in centered mode;
-     the projector writes rotateY/translateZ/scale on each item's inner. */
+  /* Coverflow variant (`variant="coverflow"`): the row engine in centered
+     mode; the projector writes perspective/rotateY/translateZ/scale on each
+     item's inner. The perspective is local to each inner's transform — a
+     shared one on this scroll container would have its vanishing point in
+     the scrolled content's coordinate space and drift off-screen as the
+     track scrolls (see CoverflowTrack). */
   .slider__track--coverflow {
-    /* Shared vanishing point for all panels. */
-    perspective: 1200px;
+    /* The projector's per-item z-indexes (center above neighbors) are an
+       internal affair — contain them so panels can't rise above the host
+       page's own layers (e.g. a fixed sidebar). */
+    isolation: isolate;
     /* Rotated corners swing above/below the item box — widen the clip
        compensation so they don't get cut. */
     padding-block: 96px;
@@ -222,10 +284,6 @@
       height: var(--item-max-h);
       max-width: none;
       margin-inline: calc(var(--item-max-w) * -0.08);
-      /* The 3D transform lives on the inner (a grandchild of the track);
-         without preserve-3d the track's perspective never reaches it and the
-         rotation renders flat. */
-      transform-style: preserve-3d;
     }
 
     .slider__item-inner {
@@ -261,6 +319,36 @@
     }
   }
 
+  /* aspectRatio forced on the row: panels become a cover-cropped box of
+     --item-max-w × --item-max-h instead of sizing to the image. (Coverflow
+     has its own fixed box; the stack uses --stack-fixed.) */
+  .slider__track--fixed {
+    .slider__item {
+      width: var(--item-max-w);
+      height: var(--item-max-h);
+      max-width: none;
+    }
+
+    .slider__item-inner {
+      width: 100%;
+      height: 100%;
+    }
+
+    picture {
+      display: block;
+      width: 100%;
+      height: 100%;
+    }
+
+    .slider__item img {
+      width: 100%;
+      height: 100%;
+      max-width: none;
+      max-height: none;
+      object-fit: cover;
+    }
+  }
+
   .slider__meta {
     margin-top: 0.75lh;
     display: flex;
@@ -274,35 +362,63 @@
     }
     p {
       color: var(--text-color);
+      margin: 0;
+    }
+  }
+
+  /* Title over subtitle. The `<br/>` between them separates inline captions
+     (the morphing default); with block renderers like PlainCaption it would
+     add a blank line, so stack as a column and drop the break. */
+  .slider__meta-inner {
+    display: flex;
+    flex-direction: column;
+
+    br {
+      display: none;
+    }
+  }
+
+  /* Coverflow and stack center their panels, so the caption centers to match. */
+  &.slider--coverflow,
+  &.slider--stack {
+    .slider__meta {
+      justify-content: center;
+    }
+
+    .slider__meta-inner {
+      align-items: center;
+      text-align: center;
     }
   }
 
   /* Opt-in prev/next arrows and pagination dots (`arrows` / `pagination`),
-     sitting to the right of the caption. Buttons follow .lightbox__nav. */
+     centered below the caption: circular arrow buttons flanking a rounded pill
+     of dots, the active dot stretched into a capsule. */
   .slider__controls {
+    margin-top: 1.6rem;
     display: flex;
+    justify-content: center;
     align-items: center;
     gap: 0.8rem;
-    flex-shrink: 0;
   }
 
   .slider__nav {
     display: flex;
     align-items: center;
     justify-content: center;
-    width: 3.6rem;
-    height: 3.6rem;
+    width: 4rem;
+    height: 4rem;
     padding: 0;
     border: none;
-    border-radius: 10px;
+    border-radius: 50%;
     color: var(--color-text);
     cursor: pointer;
-    background: color-mix(in srgb, var(--accent-color) 10%, transparent);
+    background: color-mix(in srgb, var(--accent-color) 8%, transparent);
     transition: background 0.25s ease;
 
     @media (hover: hover) {
       &:hover:not(:disabled) {
-        background: color-mix(in srgb, var(--accent-color) 18%, transparent);
+        background: color-mix(in srgb, var(--accent-color) 15%, transparent);
       }
     }
 
@@ -320,8 +436,11 @@
   .slider__dots {
     display: flex;
     align-items: center;
-    gap: 0.8rem;
-    padding-inline: 0.4rem;
+    gap: 0.7rem;
+    height: 4rem;
+    padding-inline: 1.4rem;
+    border-radius: 999px;
+    background: color-mix(in srgb, var(--accent-color) 8%, transparent);
   }
 
   .slider__dot {
@@ -329,18 +448,22 @@
     height: 0.7rem;
     padding: 0;
     border: none;
-    border-radius: 50%;
+    border-radius: 999px;
     cursor: pointer;
-    background: color-mix(in srgb, var(--accent-color) 25%, transparent);
-    transition: background 0.25s ease;
+    background: color-mix(in srgb, var(--accent-color) 28%, transparent);
+    transition:
+      background 0.25s ease,
+      width 0.25s ease;
 
     @media (hover: hover) {
       &:hover {
-        background: color-mix(in srgb, var(--accent-color) 50%, transparent);
+        background: color-mix(in srgb, var(--accent-color) 45%, transparent);
       }
     }
 
+    /* Active dot stretches into a capsule. */
     &.slider__dot--active {
+      width: 2rem;
       background: var(--accent-color);
     }
 

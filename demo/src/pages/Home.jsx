@@ -1,5 +1,4 @@
 import { Link } from "react-router";
-import { IconLink } from "../IconLink";
 import { ArrowIcon } from "../ArrowIcon";
 // Import the library straight from source — the demo doubles as a smoke test of
 // the package's public entry. Consumers instead import from "vitrine".
@@ -7,6 +6,7 @@ import { Slider } from "../../../src/index.jsx";
 import { SliderSkeleton } from "../SliderSkeleton.jsx";
 import { InstallTabs } from "../components/InstallTabs.jsx";
 import { CodeBlock } from "../components/CodeBlock.jsx";
+import { Footer } from "../components/Footer.jsx";
 import { useProjects } from "../useDemoData.js";
 
 // Usage snippet shown under the install tabs, also the copy target.
@@ -24,20 +24,13 @@ export default function Home() {
         <div className="subgrid">
           <header className="page__header">
             <h1>Vitrine</h1>
-            <p>Opinionated gallery slider with lightbox and video support.</p>
-            <div className="credit">
-              <span>Images from the</span>
-              <IconLink href="https://www.artic.edu/" icon={<ArrowIcon />}>
-                Art Institue of Chicago
-              </IconLink>
-            </div>
+            <p>
+              Opinionated gallery slider with lightbox, video support and
+              alternate layouts.
+            </p>
             <div className="features">
-              <span>Browse the</span>
-              <Link className="icon-link" to="/docs">
-                <span className="icon-link__icon">
-                  <ArrowIcon />
-                </span>
-                <span className="icon-link__text">docs & demos</span>
+              <Link className="docs-link" to="/docs">
+                Documentation
               </Link>
             </div>
           </header>
@@ -63,16 +56,9 @@ export default function Home() {
               </a>
             </p>
           </section>
-          <section className="credits">
-            <div className="credit">
-              <span>Made by</span>
-              <IconLink href="https://oliviercarignan.com">
-                Olivier Carignan
-              </IconLink>
-            </div>
-          </section>
         </div>
       </div>
+      <Footer />
     </main>
   );
 }

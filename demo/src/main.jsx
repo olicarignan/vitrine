@@ -4,15 +4,12 @@ import { Analytics } from "@vercel/analytics/react";
 import Home from "./pages/Home.jsx";
 import DocsLayout from "./pages/docs/DocsLayout.jsx";
 import GettingStarted from "./pages/docs/GettingStarted.jsx";
-import CarouselPage from "./pages/docs/CarouselPage.jsx";
-import CaptionsPage from "./pages/docs/CaptionsPage.jsx";
+import ApiPage from "./pages/docs/ApiPage.jsx";
+import SliderPage from "./pages/docs/SliderPage.jsx";
 import VideoPage from "./pages/docs/VideoPage.jsx";
 import LightboxPage from "./pages/docs/LightboxPage.jsx";
-import CursorPage from "./pages/docs/CursorPage.jsx";
 import StackPage from "./pages/docs/StackPage.jsx";
 import CoverflowPage from "./pages/docs/CoverflowPage.jsx";
-import NavigationPage from "./pages/docs/NavigationPage.jsx";
-import MultiplePage from "./pages/docs/MultiplePage.jsx";
 
 import "./demo.css";
 import "./grid.css";
@@ -27,15 +24,12 @@ const router = createBrowserRouter([
     element: <DocsLayout />,
     children: [
       { index: true, element: <GettingStarted /> },
-      { path: "carousel", element: <CarouselPage /> },
-      { path: "captions", element: <CaptionsPage /> },
+      { path: "api", element: <ApiPage /> },
+      { path: "slider", element: <SliderPage /> },
       { path: "video", element: <VideoPage /> },
       { path: "lightbox", element: <LightboxPage /> },
-      { path: "cursor", element: <CursorPage /> },
-      { path: "stack", element: <StackPage /> },
       { path: "coverflow", element: <CoverflowPage /> },
-      { path: "navigation", element: <NavigationPage /> },
-      { path: "multiple", element: <MultiplePage /> },
+      { path: "stack", element: <StackPage /> },
     ],
   },
 ]);
