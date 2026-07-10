@@ -14,7 +14,7 @@ import CoverflowPage from "./pages/docs/CoverflowPage.jsx";
 import "./demo.css";
 import "./grid.css";
 // The slider + lightbox styles come straight from the library source so the
-// demo exercises the real package. Consumers instead import "vitrine/styles.css".
+// demo exercises the real package. Consumers instead import "@ocarignan/vitrine/styles.css".
 import "../../src/styles.css";
 
 const router = createBrowserRouter([

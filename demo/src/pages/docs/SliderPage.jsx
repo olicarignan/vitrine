@@ -5,8 +5,8 @@ import { useProjects, splitItems } from "../../useDemoData.js";
 import { DocsIntro, DocsBlock, DocsExampleHeading } from "./DocsBlocks.jsx";
 import { CodeBlock } from "../../components/CodeBlock.jsx";
 
-const SNIPPET = `import { Slider, PlainCaption } from "vitrine";
-import "vitrine/styles.css";
+const SNIPPET = `import { Slider, PlainCaption } from "@ocarignan/vitrine";
+import "@ocarignan/vitrine/styles.css";
 
 // The default carousel — captions morph between items (metamorphosis TextMorph)
 <Slider items={items} />

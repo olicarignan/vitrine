@@ -9,6 +9,6 @@ export default defineConfig({
   // dedupe also forces these bare specifiers to resolve from the demo root —
   // without it the out-of-tree library source can't find them when only demo/
   // is installed (e.g. on Vercel, where the repo root has no node_modules).
-  resolve: { dedupe: ["react", "react-dom", "motion", "metamorphosis"] },
+  resolve: { dedupe: ["react", "react-dom", "motion", "@ocarignan/metamorphosis"] },
   server: { fs: { allow: [".."] } },
 });

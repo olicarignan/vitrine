@@ -1,7 +1,7 @@
 "use client";
 
 import { useRef, useState, useEffect } from "react";
-import { IconMorph } from "metamorphosis/react";
+import { IconMorph } from "@ocarignan/metamorphosis/react";
 
 // Maps the element under the pointer to the icon the cursor should morph into.
 // Returns null when the pointer isn't over an interactive surface (the cursor

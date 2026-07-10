@@ -1,7 +1,7 @@
 import { Link } from "react-router";
 import { ArrowIcon } from "../ArrowIcon";
 // Import the library straight from source — the demo doubles as a smoke test of
-// the package's public entry. Consumers instead import from "vitrine".
+// the package's public entry. Consumers instead import from "@ocarignan/vitrine".
 import { Slider } from "../../../src/index.jsx";
 import { SliderSkeleton } from "../SliderSkeleton.jsx";
 import { InstallTabs } from "../components/InstallTabs.jsx";
@@ -10,8 +10,8 @@ import { Footer } from "../components/Footer.jsx";
 import { useProjects } from "../useDemoData.js";
 
 // Usage snippet shown under the install tabs, also the copy target.
-const USAGE = `import { Slider } from "vitrine";
-import "vitrine/styles.css";
+const USAGE = `import { Slider } from "@ocarignan/vitrine";
+import "@ocarignan/vitrine/styles.css";
 
 <Slider items={items} />;`;
 

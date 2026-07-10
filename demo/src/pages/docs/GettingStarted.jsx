@@ -2,8 +2,8 @@ import { DocsIntro, DocsBlock } from "./DocsBlocks.jsx";
 import { InstallTabs } from "../../components/InstallTabs.jsx";
 import { CodeBlock } from "../../components/CodeBlock.jsx";
 
-const USAGE = `import { Slider } from "vitrine";
-import "vitrine/styles.css";
+const USAGE = `import { Slider } from "@ocarignan/vitrine";
+import "@ocarignan/vitrine/styles.css";
 
 <Slider items={items} />;`;
 

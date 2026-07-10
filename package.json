@@ -1,7 +1,10 @@
 {
-  "name": "vitrine",
-  "version": "0.1.0",
-  "description": "A draggable project slider with a shared-element zoom lightbox for React. Self-contained, prop-driven, install from GitHub.",
+  "name": "@ocarignan/vitrine",
+  "version": "0.1.1",
+  "description": "A draggable project slider with a shared-element zoom lightbox for React. Self-contained, prop-driven, installable from npm.",
+  "publishConfig": {
+    "access": "public"
+  },
   "main": "dist/index.js",
   "module": "dist/index.mjs",
   "types": "index.d.ts",
@@ -38,13 +41,8 @@
     "react-dom": ">=18"
   },
   "dependencies": {
-    "metamorphosis": "github:olicarignan/metamorphosis#e0419aa029beb0dcfd7c64e979997e02d084ae8f",
+    "@ocarignan/metamorphosis": "^0.1.1",
     "motion": "^12.19.1"
-  },
-  "pnpm": {
-    "onlyBuiltDependencies": [
-      "metamorphosis"
-    ]
   },
   "devDependencies": {
     "tsup": "^8.5.0",

@@ -3,7 +3,7 @@
 import { useRef, useState, useEffect, useCallback, useId } from "react";
 import { flushSync } from "react-dom";
 import { motion, AnimatePresence } from "motion/react";
-import { TextMorph } from "metamorphosis/react";
+import { TextMorph } from "@ocarignan/metamorphosis/react";
 import { Lightbox } from "./Lightbox";
 import { MorphCursor } from "./MorphCursor";
 import { RowTrack } from "./tracks/RowTrack";

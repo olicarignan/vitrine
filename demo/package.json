@@ -11,7 +11,7 @@
   },
   "dependencies": {
     "@vercel/analytics": "^2.0.1",
-    "metamorphosis": "github:olicarignan/metamorphosis#e0419aa029beb0dcfd7c64e979997e02d084ae8f",
+    "@ocarignan/metamorphosis": "^0.1.1",
     "motion": "^12.19.1",
     "react": "^19.0.0",
     "react-dom": "^19.0.0",
@@ -20,10 +20,5 @@
   "devDependencies": {
     "@vitejs/plugin-react": "^4.3.4",
     "vite": "^6.0.7"
-  },
-  "pnpm": {
-    "onlyBuiltDependencies": [
-      "metamorphosis"
-    ]
   }
 }

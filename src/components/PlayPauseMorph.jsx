@@ -1,6 +1,6 @@
 "use client";
 
-import { IconMorph } from "metamorphosis/react";
+import { IconMorph } from "@ocarignan/metamorphosis/react";
 import { PLAY_ICON_DEF, PAUSE_ICON_DEF } from "./icons";
 
 /**

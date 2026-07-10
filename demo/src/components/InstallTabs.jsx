@@ -1,13 +1,13 @@
 import { useState } from "react";
-import { TextMorph } from "metamorphosis/react";
+import { TextMorph } from "@ocarignan/metamorphosis/react";
 import { CopyButton } from "./CopyButton";
 
 // Install command per package manager — the morph target for the install tabs.
 const INSTALL = [
-  { id: "pnpm", cmd: "pnpm i github:olicarignan/vitrine" },
-  { id: "npm", cmd: "npm i github:olicarignan/vitrine" },
-  { id: "bun", cmd: "bun i github:olicarignan/vitrine" },
-  { id: "yarn", cmd: "yarn add github:olicarignan/vitrine" },
+  { id: "pnpm", cmd: "pnpm i @ocarignan/vitrine" },
+  { id: "npm", cmd: "npm i @ocarignan/vitrine" },
+  { id: "bun", cmd: "bun i @ocarignan/vitrine" },
+  { id: "yarn", cmd: "yarn add @ocarignan/vitrine" },
 ];
 
 /**

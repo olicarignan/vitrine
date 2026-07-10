@@ -8,8 +8,8 @@ Built with React 19, [`motion`](https://motion.dev), and the native
 [View Transitions API](https://developer.mozilla.org/en-US/docs/Web/API/View_Transitions_API)
 (progressive enhancement — falls back to a plain open/close where unsupported).
 The caption morphs between projects by default, powered by
-[`metamorphosis`](https://github.com/olicarignan/metamorphosis) — a
-dependency-free animated-text component that comes along as a dependency. Pass
+[`@ocarignan/metamorphosis`](https://www.npmjs.com/package/@ocarignan/metamorphosis) —
+a dependency-free animated-text component that comes along as a dependency. Pass
 the bundled `PlainCaption` (or your own component) to the `Caption` prop to opt
 out of the animation.
 
@@ -18,8 +18,8 @@ out of the animation.
 This repo is both the published library and a live demo:
 
 - **`src/`** — the library. `Slider`, `Lightbox`, and the stylesheets. Built to
-  `dist/` with [`tsup`](https://tsup.egoist.dev) (ESM + CJS) and installed
-  straight from GitHub.
+  `dist/` with [`tsup`](https://tsup.egoist.dev) (ESM + CJS) and published to npm
+  as [`@ocarignan/vitrine`](https://www.npmjs.com/package/@ocarignan/vitrine).
 - **`demo/`** — a standalone Vite app that imports the library from `../src` and
   doubles as a smoke test of the public entry. It has its own `package.json`.
 
@@ -75,25 +75,19 @@ skipped.
 ## Install
 
 ```bash
-pnpm add github:olicarignan/vitrine
+pnpm add @ocarignan/vitrine
 ```
 
 `react` and `react-dom` (`>=18`) are peer dependencies; `motion` and
-[`metamorphosis`](https://github.com/olicarignan/metamorphosis) (the morphing
-caption) come along as dependencies. Both vitrine and metamorphosis build
-themselves from source on install (a `prepare` script runs `tsup`). pnpm (v10+)
-requires git deps with build scripts to be allowlisted, so add this to your
-`package.json`:
-
-```json
-"pnpm": { "onlyBuiltDependencies": ["vitrine", "metamorphosis"] }
-```
+[`@ocarignan/metamorphosis`](https://www.npmjs.com/package/@ocarignan/metamorphosis)
+(the morphing caption) come along as dependencies — both ship prebuilt, so
+there's nothing to allowlist or build.
 
 Import the component and its stylesheet once, then render with your items:
 
 ```jsx
-import { Slider } from "vitrine";
-import "vitrine/styles.css";
+import { Slider } from "@ocarignan/vitrine";
+import "@ocarignan/vitrine/styles.css";
 
 <Slider items={items} />;
 ```
@@ -183,7 +177,7 @@ The meta caption morphs between projects by default (letter morphing via
 `PlainCaption` to the `Caption` prop:
 
 ```jsx
-import { Slider, PlainCaption } from "vitrine";
+import { Slider, PlainCaption } from "@ocarignan/vitrine";
 
 <Slider items={items} Caption={PlainCaption} />;
 ```

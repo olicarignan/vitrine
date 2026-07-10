@@ -8,7 +8,7 @@ import {
   useCallback,
 } from "react";
 import { motion } from "motion/react";
-import { TextMorph } from "metamorphosis/react";
+import { TextMorph } from "@ocarignan/metamorphosis/react";
 import { ChevronLeftIcon, ChevronRightIcon, CloseIcon } from "./icons";
 import { LightboxVideoControls } from "./LightboxVideoControls";
 
