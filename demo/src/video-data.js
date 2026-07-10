@@ -3,7 +3,7 @@
 // No key-less art-museum API serves playable video, so the video slider draws
 // from Pexels instead: a large library of free, no-attribution-required stock
 // clips served as CORS-open MP4 (which — unlike Wikimedia's webm/ogv — autoplays
-// on Safari/iOS too). We search a random abstract/motion term each load, pick a
+// on Safari/iOS too). We search a random paint-mixing term each load, pick a
 // sensibly-sized rendition, and map results into the flat item shape the slider
 // expects, using the poster `image` as `src` and the MP4 as the looping `video`.
 //
@@ -26,18 +26,13 @@ const ENV_KEY =
 // six looping panels stay light while still looking crisp.
 const TARGET_WIDTH = 1280;
 
-// Abstract/motion search terms; a fresh random one each load keeps the set varied.
+// Paint-mixing search terms; a fresh random one each load keeps the set varied
+// while staying within the paint-mixing theme.
 const QUERY_TERMS = [
-  "ink in water",
-  "fluid art",
   "abstract paint",
-  "liquid color",
-  "smoke motion",
-  "colorful abstract",
-  "paint mixing",
-  "light abstract",
-  "slow motion color",
-  "abstract texture",
+  "acrylic pouring",
+  "fluid paint",
+  "abstract colors",
 ];
 
 // "https://www.pexels.com/video/oil-painting-and-spatulas-7037886/"
