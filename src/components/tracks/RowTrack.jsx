@@ -195,6 +195,13 @@ export const RowTrack = forwardRef(function RowTrack(
             boxW = Math.round(boxH * aspectRatio);
           }
         }
+        // Trailing room so the last panel can scroll to the slot — and no
+        // further. Panels are `fit-content`, so the width that matters is the
+        // last one's actual laid-out width; `boxW` (its cap) is the best guess
+        // before the first paint, and the observer below corrects it after.
+        const lastEl = trackRef.current?.querySelector(
+          ".slider__item:last-child",
+        );
         setLayout({
           inset,
           itemWidth: boxW,
@@ -202,8 +209,7 @@ export const RowTrack = forwardRef(function RowTrack(
           // Caption aligns to the active panel's left edge, plus an optional indent.
           metaInset: inset + metaOffsetColumns * (oneCol + colGap),
           metaInsetRight: inset,
-          // Trailing room so the last panel can scroll fully to the left edge.
-          endPad: vw - inset,
+          endPad: Math.max(0, vw - inset - (lastEl?.offsetWidth || boxW)),
           isMobile: false,
           centered: false,
           fixedAspect: Boolean(aspectRatio),
@@ -255,6 +261,46 @@ export const RowTrack = forwardRef(function RowTrack(
       clearTimeout(resizeTimer);
     };
   }, [contentWidth, gap, columns, metaOffsetColumns, sideMargin, maxItemHeight, aspectRatio, centered]);
+
+  /* Desktop row only: keep the trailing pad at exactly the room the last panel
+     needs to reach the slot. Too much and the track scrolls past it into empty
+     space — a phantom slot after the last item. The panel is `fit-content`, so
+     its width lands late (image decode, font/layout settle) and can change
+     without a resize event; the observer re-syncs when it does. The centered
+     modes (mobile, coverflow) pad by half the leftover viewport instead, which
+     is exact by construction, so they skip this. */
+  useEffect(() => {
+    if (layout.centered || layout.isMobile) return;
+    const track = trackRef.current;
+    const itemEls = track?.querySelectorAll(".slider__item");
+    const last = itemEls?.[itemEls.length - 1];
+    if (!last) return;
+
+    const sync = () => {
+      const endPad = Math.max(
+        0,
+        window.innerWidth - layout.inset - last.offsetWidth,
+      );
+      setLayout((prev) =>
+        prev.endPad === endPad || prev.centered || prev.isMobile
+          ? prev
+          : { ...prev, endPad },
+      );
+    };
+
+    sync();
+    const ro = new ResizeObserver(sync);
+    ro.observe(last);
+    return () => ro.disconnect();
+  }, [
+    layout.centered,
+    layout.isMobile,
+    layout.inset,
+    layout.itemWidth,
+    layout.itemHeight,
+    sets,
+    n,
+  ]);
 
   // The meta caption (rendered by the orchestrator) aligns to this layout.
   useEffect(() => {
