@@ -13,8 +13,9 @@ import { RowTrack } from "./RowTrack";
  */
 export const CoverflowTrack = forwardRef(function CoverflowTrack(props, ref) {
   // Writes the per-item 3D transform inside the scroll rAF. `t` is the item's
-  // signed distance from the viewport center in item-widths, clamped so far
-  // items stop rotating/receding and just line up.
+  // signed distance from the active slot's center in item-widths, clamped so
+  // far items stop rotating/receding and just line up. The track hands over
+  // precomputed geometry rather than rects — see RowTrack's geometry cache.
   //
   // The perspective is local (inside each inner's transform), not a shared
   // one on the track: a perspective on a scroll container has its vanishing
@@ -22,16 +23,18 @@ export const CoverflowTrack = forwardRef(function CoverflowTrack(props, ref) {
   // as the track scrolls and the projection skews asymmetrically — visible
   // after the lightbox parks the track deep into the row. Local perspective
   // is scroll-independent and matches the lightbox's projection model.
-  const projector = useCallback(({ itemEls, rects, center, vw, lo, hi }) => {
+  const projector = useCallback(({ itemEls, slotTargets, widths, scroll, vw, lo, hi }) => {
     const isMobile = vw < 700;
     const maxRotate = isMobile ? 30 : 45;
     const maxDepth = isMobile ? 60 : 120;
 
     for (let i = lo; i <= hi; i++) {
-      const rect = rects[i];
+      // `slotTargets[i] - scroll` is the item centre's signed offset from the
+      // slot centre, precomputed by the track so this stays arithmetic — a
+      // getBoundingClientRect per item here would flush layout every frame.
       const t = Math.max(
         -2,
-        Math.min(2, (rect.left + rect.width / 2 - center) / rect.width),
+        Math.min(2, (slotTargets[i] - scroll) / widths[i]),
       );
       const a = Math.min(Math.abs(t), 1);
       const inner = itemEls[i].querySelector(".slider__item-inner");

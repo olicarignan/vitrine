@@ -2,6 +2,7 @@
 
 import {
   forwardRef,
+  memo,
   useRef,
   useState,
   useEffect,
@@ -11,6 +12,72 @@ import {
 import { motion } from "motion/react";
 import { SliderItemMedia } from "../SliderItemMedia";
 import { itemFadeIn } from "../animation";
+
+/**
+ * One track panel. Memoised on purpose: the active index changes on nearly
+ * every frame of a scroll, and without this each change re-renders all
+ * `sets * n` panels through Motion — 50 of them at the looping coverflow
+ * default. That is enough main-thread work per frame to starve the scroll
+ * handler during a fling. Only the two panels whose `isActive` actually
+ * flipped re-render now.
+ */
+const TrackItem = memo(function TrackItem({
+  item,
+  pos,
+  index,
+  clone,
+  isActive,
+  interactive,
+  itemCursor,
+  itemWidth,
+  itemHeight,
+  sizes,
+  video,
+  videoControls,
+  onActivate,
+}) {
+  return (
+    <motion.div
+      data-clone={clone ? "" : undefined}
+      className={`slider__item${isActive ? " slider__item--active" : ""}`}
+      // Clones skip the mount stagger (they'd push the real items' fade
+      // far down the stagger order) and stay out of the a11y tree.
+      variants={clone ? undefined : itemFadeIn}
+      role={interactive ? "button" : undefined}
+      tabIndex={interactive ? 0 : undefined}
+      aria-label={interactive ? item.title : undefined}
+      aria-hidden={clone ? true : undefined}
+      style={{
+        "--item-max-w": `${itemWidth}px`,
+        "--item-max-h": `${itemHeight}px`,
+        cursor: itemCursor,
+      }}
+      onClick={() => onActivate(pos, false)}
+      onKeyDown={
+        interactive
+          ? (e) => {
+              if (e.key === "Enter" || e.key === " ") {
+                e.preventDefault();
+                onActivate(pos, true);
+              }
+            }
+          : undefined
+      }
+    >
+      <div className="slider__item-inner">
+        <SliderItemMedia
+          item={item}
+          index={index}
+          sizes={sizes}
+          // No <video> on clones — one autoplaying element per item.
+          video={video && !clone}
+          videoControls={videoControls}
+          isActive={isActive}
+        />
+      </div>
+    </motion.div>
+  );
+});
 
 /**
  * The default track engine: a horizontal scroll-snap row with pointer drag,
@@ -57,8 +124,9 @@ export const RowTrack = forwardRef(function RowTrack(
     onLayoutChange,
     // "row" (default) or "coverflow" (uniform centered boxes + projector).
     mode = "row",
-    // Coverflow only: writes the 3D transforms. Called with
-    // ({ itemEls, rects, center, vw, lo, hi }) inside the scroll rAF.
+    // Coverflow only: writes the 3D transforms. Called inside the scroll rAF
+    // with ({ itemEls, slotTargets, widths, scroll, vw, lo, hi }); an item's
+    // signed offset from the slot centre is `slotTargets[i] - scroll`.
     projector,
     // Extra modifier class on the track element (e.g. "slider__track--coverflow").
     trackClassName,
@@ -71,6 +139,10 @@ export const RowTrack = forwardRef(function RowTrack(
   ref,
 ) {
   const trackRef = useRef(null);
+  // Mirror of the prop, so the per-panel callbacks can stay referentially
+  // stable across active-index changes (see handleItemClick).
+  const activeIndexRef = useRef(activeIndex);
+  activeIndexRef.current = activeIndex;
   const dragState = useRef({ isDragging: false, startX: 0, scrollLeft: 0 });
   const dragDistRef = useRef(0);
   const externalScroll = useRef(false);
@@ -94,10 +166,14 @@ export const RowTrack = forwardRef(function RowTrack(
      pixel-identical, so the jump is invisible. Whenever scrolling settles the
      position is normalized back onto the real set, so at rest the centered
      element is always a real item and clicks, shared-element zooms, and
-     `park()` never target a clone. Two-plus sets per side give native (wheel)
-     scrolling runway between settles; small arrays get more. */
+     `park()` never target a clone. */
   const n = items.length;
-  const copies = loop && n > 0 ? Math.max(2, Math.ceil(8 / n)) : 0;
+  /* Three sets per side, not two. Under wheel/momentum scrolling the compositor
+     owns the scroll offset and reverts our teleports (see handleScroll), so
+     between settles it is the runway — not the teleport — that has to absorb a
+     fling. Two sets left barely a span of headroom past the teleport window and
+     a hard flick could reach the end and stop dead; small arrays get more. */
+  const copies = loop && n > 0 ? Math.max(3, Math.ceil(12 / n)) : 0;
   const sets = 2 * copies + 1;
   // True while a native smooth scroll (scrollIntoView) is in flight: the
   // browser animates toward an absolute position, so teleporting the scroll
@@ -105,6 +181,26 @@ export const RowTrack = forwardRef(function RowTrack(
   const smoothRef = useRef(false);
   const smoothTimer = useRef(null);
   const idleTimer = useRef(null);
+  /* True while the browser owns the scroll position. Under a wheel/momentum
+     sequence the compositor holds the authoritative offset: a teleport written
+     from the main thread lands (the getter even reports it back, snapped to the
+     nearest snap point) and is then reverted on the very next frame. The
+     position is outside the loop window again, so we teleport again, every
+     frame, for the whole tail of the fling — the track renders at offsets a
+     whole set apart frame to frame, which is the flicker, and the caption
+     cannot keep up.
+
+     Rather than guess at engine behaviour we check whether the write survived,
+     one frame later (see handleScroll), and back off until the scroll stops. */
+  const browserDrivenRef = useRef(false);
+  // True once we have observed the compositor revert a teleport written under a
+  // wheel/momentum scroll. It is a platform trait, not a transient state, so it
+  // is never cleared: after the first probe we simply stop writing under wheel
+  // scrolling and let the clone runway carry the fling to its settle.
+  const wheelRejectedRef = useRef(false);
+  const lastTeleportAtRef = useRef(0);
+  // True while our own JS inertia is driving the scroll frame by frame.
+  const inertiaRef = useRef(false);
 
   useEffect(() => {
     const measure = () => {
@@ -321,6 +417,88 @@ export const RowTrack = forwardRef(function RowTrack(
     [snapInline, layout.inset],
   );
 
+  /* Cached track geometry — `slotTargets[i]` is the scrollLeft that parks item
+     i in the active slot, so an item's signed distance from the slot is just
+     `slotTargets[i] - scrollLeft`. Every scroll-driven read (active item, loop
+     teleport, normalize, the coverflow projector) reduces to that one
+     subtraction: no getBoundingClientRect, no layout flush, no DOM query.
+
+     This matters at fling speed. The scroll runs on the compositor, so it
+     keeps moving at full rate while the main thread measures every box each
+     frame and re-renders. Once the main thread falls behind, the caption
+     freezes while the track visibly keeps going and the loop teleport starts
+     firing against stale positions — the "stuck in a loop" glitch.
+
+     The cache is rebuilt on any layout change and re-validated on every read,
+     so a late-settling panel can't leave it stale. */
+  const geomRef = useRef(null);
+
+  const measureGeometry = useCallback(() => {
+    const track = trackRef.current;
+    if (!track) return null;
+    const els = track.querySelectorAll(".slider__item");
+    if (!els.length) return null;
+    const count = els.length;
+    const slotTargets = new Float64Array(count);
+    const widths = new Float64Array(count);
+    const half = track.clientWidth / 2;
+    for (let i = 0; i < count; i++) {
+      const w = els[i].offsetWidth;
+      widths[i] = w;
+      slotTargets[i] =
+        snapInline === "center"
+          ? els[i].offsetLeft + w / 2 - half
+          : els[i].offsetLeft - layout.inset;
+    }
+    return { els, widths, slotTargets, count, scrollWidth: track.scrollWidth };
+  }, [snapInline, layout.inset]);
+
+  // Stamp the cache with the measure that produced it. `measureGeometry`'s
+  // identity changes with `snapInline` and `layout.inset`, so a breakpoint
+  // crossing invalidates on the next read instead of waiting for the
+  // re-measure effect to commit.
+  const remeasure = useCallback(() => {
+    const fresh = measureGeometry();
+    if (fresh) fresh.key = measureGeometry;
+    geomRef.current = fresh;
+    return fresh;
+  }, [measureGeometry]);
+
+  const getGeometry = useCallback(() => {
+    const track = trackRef.current;
+    if (!track) return null;
+    const cached = geomRef.current;
+    // Centered panels are a fixed `--item-max-w`, so count + key is enough to
+    // know the cache still holds. Row panels are `fit-content` and settle late
+    // (image decode, fonts), so those are validated against the track's own
+    // scroll extent too — one read that moves whenever a panel's width does.
+    if (
+      cached &&
+      cached.count === sets * n &&
+      cached.key === measureGeometry &&
+      (layout.centered || cached.scrollWidth === track.scrollWidth)
+    ) {
+      return cached;
+    }
+    return remeasure();
+  }, [layout.centered, measureGeometry, remeasure, sets, n]);
+
+  // Re-measure whenever the panels move: a layout pass, a resize, or a change
+  // to the item set. Declared above the projector effect so the cache is warm
+  // before the first projection runs.
+  useEffect(() => {
+    remeasure();
+  }, [remeasure, layout, items, sets, n]);
+
+  // The scroll geometry of one cloned set, for the loop teleport.
+  const getLoopGeom = useCallback(() => {
+    if (n === 0) return null;
+    const geom = getGeometry();
+    if (!geom || geom.count !== sets * n) return null;
+    const span = geom.slotTargets[n] - geom.slotTargets[0];
+    return span ? { geom, span, home: geom.slotTargets[copies * n] } : null;
+  }, [getGeometry, sets, n, copies]);
+
   useEffect(() => {
     const track = trackRef.current;
     if (!track) return;
@@ -346,14 +524,14 @@ export const RowTrack = forwardRef(function RowTrack(
   const normalize = useCallback(() => {
     const track = trackRef.current;
     if (!track || !copies || dragState.current.isDragging) return;
-    const itemEls = track.querySelectorAll(".slider__item");
-    if (n === 0 || itemEls.length !== sets * n) return;
-    const span = itemEls[n].offsetLeft - itemEls[0].offsetLeft;
-    if (!span) return;
+    const lg = getLoopGeom();
+    if (!lg) return;
+    const { geom, span } = lg;
+    const s = track.scrollLeft;
     let closest = 0;
     let closestDist = Infinity;
-    for (let i = 0; i < itemEls.length; i++) {
-      const d = Math.abs(slotTargetFor(track, itemEls[i]) - track.scrollLeft);
+    for (let i = 0; i < geom.count; i++) {
+      const d = Math.abs(geom.slotTargets[i] - s);
       if (d < closestDist) {
         closestDist = d;
         closest = i;
@@ -362,15 +540,36 @@ export const RowTrack = forwardRef(function RowTrack(
     const set = Math.floor(closest / n);
     if (set !== copies) track.scrollLeft += (copies - set) * span;
     smoothRef.current = false;
-  }, [copies, sets, n, slotTargetFor]);
+  }, [copies, n, getLoopGeom]);
 
+  /* No `scrollend` listener here on purpose. It fires for programmatic writes
+     too, so re-seating on it meant every teleport triggered a normalize, which
+     wrote the scroll again, which fired another scrollend. The settle timer in
+     handleScroll (a gap in scroll events) is the only signal that the scroll
+     has genuinely stopped. */
+
+  /* A user gesture cancels any in-flight programmatic smooth scroll, so the
+     teleport lockout has to lift with it. Without this, a fling started inside
+     the 800ms `beginSmooth` window (right after a click, an arrow key, or the
+     drag-inertia snap) runs with looping disabled: it eats the whole clone
+     runway, slams into the hard end of the track, and then jumps when the
+     lockout finally expires and the first teleport lands. */
   useEffect(() => {
     const track = trackRef.current;
-    if (!track || !copies) return;
-    const onEnd = () => normalize();
-    track.addEventListener("scrollend", onEnd);
-    return () => track.removeEventListener("scrollend", onEnd);
-  }, [copies, normalize]);
+    if (!track) return;
+    const interrupt = () => {
+      // A user gesture cancels any in-flight programmatic smooth scroll, so
+      // the teleport lockout has to lift with it.
+      smoothRef.current = false;
+      clearTimeout(smoothTimer.current);
+    };
+    track.addEventListener("wheel", interrupt, { passive: true });
+    track.addEventListener("touchmove", interrupt, { passive: true });
+    return () => {
+      track.removeEventListener("wheel", interrupt);
+      track.removeEventListener("touchmove", interrupt);
+    };
+  }, []);
 
   const scrollToIndex = useCallback(
     (index) => {
@@ -462,16 +661,15 @@ export const RowTrack = forwardRef(function RowTrack(
   const lastActiveRef = useRef(0);
   const updateProjection = useCallback(
     (track) => {
-      const itemEls = track.querySelectorAll(".slider__item");
-      const vw = window.innerWidth;
-      const center = vw / 2;
+      const geom = getGeometry();
+      if (!geom) return lastActiveRef.current;
+      const { els, widths, slotTargets, count } = geom;
+      const scroll = track.scrollLeft;
 
-      const rects = new Array(itemEls.length);
       let closest = 0;
       let closestDist = Infinity;
-      for (let i = 0; i < itemEls.length; i++) {
-        rects[i] = itemEls[i].getBoundingClientRect();
-        const dist = Math.abs(rects[i].left + rects[i].width / 2 - center);
+      for (let i = 0; i < count; i++) {
+        const dist = Math.abs(slotTargets[i] - scroll);
         if (dist < closestDist) {
           closestDist = dist;
           closest = i;
@@ -481,15 +679,45 @@ export const RowTrack = forwardRef(function RowTrack(
       if (projector) {
         const lo = Math.max(0, Math.min(closest, lastActiveRef.current) - 3);
         const hi = Math.min(
-          itemEls.length - 1,
+          count - 1,
           Math.max(closest, lastActiveRef.current) + 3,
         );
-        projector({ itemEls, rects, center, vw, lo, hi });
+        // `slotTargets[i] - scroll` is the item's signed distance from the
+        // slot centre in px — the same number the old rect-based measure
+        // produced, minus the per-frame layout flush. (It centres on the
+        // scrollport rather than the window, which also matches where snap
+        // and `park()` actually place items when the track isn't full-bleed.)
+        projector({
+          itemEls: els,
+          slotTargets,
+          widths,
+          scroll,
+          vw: window.innerWidth,
+          lo,
+          hi,
+        });
       }
       lastActiveRef.current = closest;
       return closest;
     },
-    [projector],
+    [projector, getGeometry],
+  );
+
+  /* Only push a genuinely new index up. `onActiveIndexChange` is `setActiveIndex`
+     in the orchestrator, and at fling speed the same panel stays nearest the
+     slot for several frames — re-reporting it every frame is pure re-render
+     churn on the main thread that the scroll is already competing with.
+     Kept in sync with the committed prop below so external navigation
+     (lightbox, arrows) can't leave this ref stale. */
+  const reportedIndexRef = useRef(activeIndex);
+  reportedIndexRef.current = activeIndex;
+  const reportActive = useCallback(
+    (index) => {
+      if (reportedIndexRef.current === index) return;
+      reportedIndexRef.current = index;
+      onActiveIndexChange(index);
+    },
+    [onActiveIndexChange],
   );
 
   const handleScroll = useCallback(() => {
@@ -501,30 +729,79 @@ export const RowTrack = forwardRef(function RowTrack(
       // around the real set — same pixels, so invisible. Never under a native
       // smooth scroll (the browser animates toward an absolute position and
       // would visibly rewind); those re-seat on settle instead.
-      if (!smoothRef.current) {
-        const els = track.querySelectorAll(".slider__item");
-        if (n > 0 && els.length === sets * n) {
-          const span = els[n].offsetLeft - els[0].offsetLeft;
-          const home = slotTargetFor(track, els[copies * n]);
-          const s = track.scrollLeft;
+      const lg = getLoopGeom();
+      if (lg) {
+        const { span, home } = lg;
+        const s = track.scrollLeft;
+
+        /* The scroll is only ours to write when we are the one driving it: a
+           pointer drag, or our own inertia, where every frame is a JS write
+           anyway. Under a wheel/momentum sequence the compositor owns the
+           offset — the write lands (the getter even reports it back, snapped)
+           and is then reverted on the very next frame. That is what made the
+           teleport re-fire every frame and the track flicker.
+           `wheelRejectedRef` remembers that platform trait after one probe, so
+           it costs a single frame once per session rather than once per fling. */
+        const ownScroll = dragState.current.isDragging || inertiaRef.current;
+        const mayWrite =
+          !smoothRef.current &&
+          !browserDrivenRef.current &&
+          (ownScroll || !wheelRejectedRef.current);
+
+        if (mayWrite) {
           let shift = 0;
           // The window spans the whole real set (scroll ∈ [home, home+span])
           // padded by ¾ span each side, so normalize()'s re-seat — anywhere
           // within the real set — never lands on a boundary and the two can't
           // ping-pong. A one-span jump from either edge lands back inside.
-          if (span && s < home - span * 0.75) shift = span;
-          else if (span && s > home + span * 1.75) shift = -span;
+          if (s < home - span * 0.75) shift = span;
+          else if (s > home + span * 1.75) shift = -span;
           if (shift) {
-            track.scrollLeft = s + shift;
-            // Keep an in-flight drag's absolute base in the same frame.
-            if (dragState.current.isDragging)
-              dragState.current.scrollLeft += shift;
+            /* Two teleports inside 200ms is not real travel: crossing a whole
+               span takes far longer than that even at flick speed, so the
+               position is being put back under us between frames. Latching on
+               the interval catches that on the second attempt — the frame-later
+               check below only notices once consecutive targets diverge enough
+               to clear the tolerance, which took nine frames of flicker. */
+            const at = Date.now();
+            const burst = !ownScroll && at - lastTeleportAtRef.current < 200;
+            lastTeleportAtRef.current = at;
+
+            if (burst) {
+              browserDrivenRef.current = true;
+              wheelRejectedRef.current = true;
+            } else {
+              const target = s + shift;
+              track.scrollLeft = target;
+              // Keep an in-flight drag's absolute base in the same frame.
+              if (dragState.current.isDragging)
+                dragState.current.scrollLeft += shift;
+              /* Verify a frame later, not on the next scroll event. The write
+                 fires a scroll event of its own carrying the written value, so
+                 checking there always looked like success — while the
+                 compositor put its own offset back immediately afterwards. */
+              requestAnimationFrame(() => {
+                const t = trackRef.current;
+                if (!t) return;
+                if (Math.abs(t.scrollLeft - target) > span * 0.5) {
+                  browserDrivenRef.current = true;
+                  if (!ownScroll) wheelRejectedRef.current = true;
+                }
+              });
+            }
           }
         }
       }
-      // Settle fallback for browsers without `scrollend`.
+
+      /* Settle detection. `scrollend` is not usable here: our own writes fire
+         it while the browser's animation is still running, which is how
+         normalize() ended up re-seating the track every frame. A gap in scroll
+         events is the only honest signal that the scroll has stopped. */
       clearTimeout(idleTimer.current);
-      idleTimer.current = setTimeout(normalize, 200);
+      idleTimer.current = setTimeout(() => {
+        browserDrivenRef.current = false;
+        normalize();
+      }, 150);
     }
 
     // Note on `externalScroll` (lightbox sync): only the active-index
@@ -547,8 +824,7 @@ export const RowTrack = forwardRef(function RowTrack(
         if (!t) return;
         const closest = updateProjection(t);
         if (externalScroll.current) return;
-        onActiveIndexChange(toReal(closest));
-        clearTimeout(scrollTimer.current);
+        reportActive(toReal(closest));
       });
       return;
     }
@@ -562,8 +838,7 @@ export const RowTrack = forwardRef(function RowTrack(
         if (!t) return;
         const closest = updateMobileScales(t);
         if (externalScroll.current) return;
-        onActiveIndexChange(toReal(closest));
-        clearTimeout(scrollTimer.current);
+        reportActive(toReal(closest));
       });
       return;
     }
@@ -583,20 +858,22 @@ export const RowTrack = forwardRef(function RowTrack(
       const t = trackRef.current;
       if (!t) return;
 
-      const itemEls = t.querySelectorAll(".slider__item");
-      const slotLeft = layout.inset;
-
+      // `slotTargets[i] - scrollLeft` is exactly `rect.left - slotLeft` for a
+      // start-aligned panel, without a rect read per panel.
+      const geom = getGeometry();
+      if (!geom) return;
+      const s = t.scrollLeft;
       let bestIndex = 0;
       let bestDist = Infinity;
-      itemEls.forEach((item, i) => {
-        const dist = Math.abs(item.getBoundingClientRect().left - slotLeft);
+      for (let i = 0; i < geom.count; i++) {
+        const dist = Math.abs(geom.slotTargets[i] - s);
         if (dist < bestDist) {
           bestDist = dist;
           bestIndex = i;
         }
-      });
+      }
 
-      onActiveIndexChange(toReal(bestIndex));
+      reportActive(toReal(bestIndex));
     });
   }, [
     layout.inset,
@@ -604,11 +881,11 @@ export const RowTrack = forwardRef(function RowTrack(
     layout.isMobile,
     updateMobileScales,
     updateProjection,
-    onActiveIndexChange,
+    reportActive,
     copies,
-    sets,
     n,
-    slotTargetFor,
+    getGeometry,
+    getLoopGeom,
     normalize,
   ]);
 
@@ -640,7 +917,11 @@ export const RowTrack = forwardRef(function RowTrack(
   const handleItemClick = useCallback(
     (pos) => {
       const real = copies ? pos % n : pos;
-      const activePos = copies ? copies * n + activeIndex : activeIndex;
+      // Read through the ref, not the prop: this callback is handed to the
+      // memoised panels, so re-creating it on every active-index change would
+      // re-render all of them and undo the memo.
+      const active = activeIndexRef.current;
+      const activePos = copies ? copies * n + active : active;
       if (pos === activePos) {
         onItemOpen?.(real);
         return;
@@ -676,7 +957,6 @@ export const RowTrack = forwardRef(function RowTrack(
       track?.addEventListener("scrollend", open, { once: true });
     },
     [
-      activeIndex,
       onItemOpen,
       openOnSettle,
       scrollToIndex,
@@ -686,6 +966,16 @@ export const RowTrack = forwardRef(function RowTrack(
       beginSmooth,
       normalize,
     ],
+  );
+
+  const handleActivate = useCallback(
+    (pos, viaKey) => {
+      // Pointer capture doesn't apply to touch, so a touch drag still
+      // synthesises a click on release — ignore it once it has travelled.
+      if (!viaKey && dragDistRef.current >= 5) return;
+      handleItemClick(pos);
+    },
+    [handleItemClick],
   );
 
   const handlePointerDown = useCallback((e) => {
@@ -747,6 +1037,10 @@ export const RowTrack = forwardRef(function RowTrack(
       const friction = 0.92;
       let lastTime = performance.now();
 
+      // We drive this scroll frame by frame, so teleports are safe under it:
+      // the shift moves the base and the next `+=` continues from there.
+      inertiaRef.current = true;
+
       const step = (now) => {
         const dt = (now - lastTime) / 1000;
         lastTime = now;
@@ -756,6 +1050,7 @@ export const RowTrack = forwardRef(function RowTrack(
         if (Math.abs(velocity) > 50) {
           requestAnimationFrame(step);
         } else {
+          inertiaRef.current = false;
           // Snap to nearest item — by center in centered modes, left edge otherwise
           const itemEls = track.querySelectorAll(".slider__item");
           const center = window.innerWidth / 2;
@@ -872,49 +1167,22 @@ export const RowTrack = forwardRef(function RowTrack(
         const isActive = !clone && i === activeIndex;
         const interactive = !clone && itemsClickable;
         return (
-          <motion.div
+          <TrackItem
             key={`${Math.floor(pos / n)}:${item.id ?? i}`}
-            data-clone={clone ? "" : undefined}
-            className={`slider__item${isActive ? " slider__item--active" : ""}`}
-            // Clones skip the mount stagger (they'd push the real items' fade
-            // far down the stagger order) and stay out of the a11y tree.
-            variants={clone ? undefined : itemFadeIn}
-            role={interactive ? "button" : undefined}
-            tabIndex={interactive ? 0 : undefined}
-            aria-label={interactive ? item.title : undefined}
-            aria-hidden={clone ? true : undefined}
-            style={{
-              "--item-max-w": `${layout.itemWidth}px`,
-              "--item-max-h": `${layout.itemHeight || maxItemHeight}px`,
-              cursor: itemCursor,
-            }}
-            onClick={() => {
-              // Touch clicks (pointer capture doesn't apply to touch)
-              if (dragDistRef.current < 5) handleItemClick(pos);
-            }}
-            onKeyDown={
-              interactive
-                ? (e) => {
-                    if (e.key === "Enter" || e.key === " ") {
-                      e.preventDefault();
-                      handleItemClick(pos);
-                    }
-                  }
-                : undefined
-            }
-          >
-            <div className="slider__item-inner">
-              <SliderItemMedia
-                item={item}
-                index={i}
-                sizes={sizes}
-                // No <video> on clones — one autoplaying element per item.
-                video={video && !clone}
-                videoControls={videoControls}
-                isActive={isActive}
-              />
-            </div>
-          </motion.div>
+            item={item}
+            pos={pos}
+            index={i}
+            clone={clone}
+            isActive={isActive}
+            interactive={interactive}
+            itemCursor={itemCursor}
+            itemWidth={layout.itemWidth}
+            itemHeight={layout.itemHeight || maxItemHeight}
+            sizes={sizes}
+            video={video}
+            videoControls={videoControls}
+            onActivate={handleActivate}
+          />
         );
       })}
     </motion.div>
